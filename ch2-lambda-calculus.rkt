@@ -52,6 +52,7 @@
 (define e
   (lambda-exp 'x (app-exp (var-exp 'y)
                           (lambda-exp 'z (var-exp 'w)))))
+e
 (lambda-exp->bound-var e)
 (lambda-exp->body e)
 (app-exp->rator (lambda-exp->body e))

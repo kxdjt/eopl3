@@ -1,4 +1,7 @@
 #lang racket
+
+(provide empty-env empty-env? extend-env apply-env)
+
 (define empty-env
   (lambda ()
     '()))
@@ -36,14 +39,6 @@
         (error 'apply-env
                "No binding for ~s in ~s" var env)))
     (apply-env-imp env search-var report-no-binding-found)))
-(define e
-  (extend-env 'd 6
-              (extend-env 'y 8
-                          (extend-env 'x 7
-                                      (extend-env 'y 14
-                                                  (empty-env))))))
-(apply-env e 'y)
-#| (apply-env e 'z) |#
 (define has-binding?
   (lambda (env s)
     (cond
@@ -51,9 +46,17 @@
       ((has-binding-in-ribs? (car env) s) #t)
       (else
        (has-binding? (cdr env) s)))))
-(has-binding? e 'y)
-(has-binding? e 'z)
 (define extend-env*
   (lambda (vars vals env)
     (cons (list vars vals) env)))
-(extend-env* '(v1 v2 v3) '(1 2 3) e)
+#| (define e |#
+#|   (extend-env 'd 6 |#
+#|               (extend-env 'y 8 |#
+#|                           (extend-env 'x 7 |#
+#|                                       (extend-env 'y 14 |#
+#|                                                   (empty-env)))))) |#
+#| (apply-env e 'y) |#
+#| #| (apply-env e 'z) |# |#
+#| (has-binding? e 'y) |#
+#| (has-binding? e 'z) |#
+#| (extend-env* '(v1 v2 v3) '(1 2 3) e) |#
