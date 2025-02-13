@@ -45,6 +45,12 @@
     ;;Expression ::= unpack {identifier}* = expression in expression
     ;;               unpack-exp (list-of-identifier exp1 exp2)
     (expression ( "unpack" (arbno identifier) "=" expression "in" expression) unpack-exp)
+    ;;Expression ::= proc {identifier}*(,) expression
+    ;;               proc-exp (vars body)
+    (expression ( "proc" "(" (separated-list identifier ",")  ")" expression) proc-exp)
+    ;;Expression ::= (expression {expression}* )
+    ;;               call-exp (rator rands)
+    (expression ( "(" expression (arbno expression) ")" ) call-exp)
     ))
 
 (sllgen:make-define-datatypes scanner-spec-let grammar-let)
@@ -62,7 +68,10 @@
   #| (bool-val |#
   #|  (bool boolean?)) |#
   (list-val
-   (elist explist?)))
+   (elist explist?))
+  (proc-val
+   (proc proc?))
+  )
 (define bool-val
   (lambda (boolean)
     (if boolean
@@ -90,13 +99,20 @@
     (cases expval val
       (list-val (elist) elist)
       (else expval-extractor-error 'list val))))
+(define expval->proc
+  (lambda (val)
+    (cases expval val
+      (proc-val (proc) proc)
+      (else expval-extractor-error 'proc val))))
 (define expval->schemeval
   (lambda (val)
     (cases expval val
       (num-val (num)
                num)
       (list-val (elist)
-                (explist->schemeval elist)))))
+                (explist->schemeval elist))
+      (else eopl:error 'expval->schemeval "~s can not cast to schemeval" val)
+      )))
 (define explist->schemeval
   (lambda (elist)
     (cases explist elist
@@ -130,6 +146,18 @@
                   #t)
       (else
        #f))))
+;; Define procedure data type by scheme procedure
+(define procedure
+  (lambda (vars body env)
+    (lambda (vals)
+      (value-of body (extend-env* vars vals env)))))
+;; Proc * Val -> ExpVal
+(define apply-procedure
+  (lambda (proc vals)
+    (proc vals)))
+(define proc?
+  (lambda (proc)
+    (procedure? proc)))
 
 #| Interpreter for the LET language |#
 ;; run : string -> ExpVal
@@ -177,6 +205,13 @@
                 (cond-operator exps1 exps2 env))
       (unpack-exp (vars exp1 exp2)
                   (unpack-operator vars exp1 exp2 env))
+      (proc-exp (vars body)
+                (proc-val (procedure vars body env)))
+      (call-exp (rator rands)
+                (apply-procedure (expval->proc (value-of rator env))
+                                 (for-each-list rands
+                                                (lambda (rand)
+                                                  (value-of rand env)))))
       )))
 
 (define make-arithmetic-op
