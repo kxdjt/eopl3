@@ -30,15 +30,6 @@
     ;;Expression ::= let-op {identifier = expression}* in expression
     ;;              let-exp (op ids exps1 exp)
     (expression (let-op  (arbno identifier "=" expression )  "in" expression) let-exp)
-    ;;Expression ::= binary-op ( expression, expression)
-    ;;              binaryop-exp (op exp1 exp2)
-    (expression (binary-op "(" expression "," expression ")") binaryop-exp)
-    ;;Expression :: unary-op (expression)
-    ;;              unaryop-exp (op exp1)
-    (expression (unary-op "(" expression ")") unaryop-exp)
-    ;;Expression :: none-op
-    ;;              noneop-exp (op)
-    (expression (none-op) noneop-exp)
     ;;Expression ::= cond { experssion ==> expression }* end
     ;;               cond-exp (list-of-cond list-of-exp)
     (expression ( "cond" "{" (arbno expression "==>" expression) "}") cond-exp)
@@ -51,6 +42,10 @@
     ;;Expression ::= (expression {expression}* )
     ;;               call-exp (rator rands)
     (expression ( "(" expression (arbno expression) ")" ) call-exp)
+    (expression (inner-operator) innerop-exp)
+    (inner-operator (none-op) none-op)
+    (inner-operator (binary-op) binary-op)
+    (inner-operator (unary-op) unary-op)
     ))
 
 (sllgen:make-define-datatypes scanner-spec-let grammar-let)
@@ -71,6 +66,8 @@
    (elist explist?))
   (proc-val
    (proc proc?))
+  (innerop-val
+   (innerop inner-operator?))
   )
 (define bool-val
   (lambda (boolean)
@@ -183,37 +180,42 @@
     (cases expression exp
       (const-exp (num)
                  (num-val num))
+      (var-exp (var)
+               (apply-env env var))
+      (innerop-exp (inner-op)
+                   (innerop-val inner-op))
       (if-exp (exp1 exp2 exp3)
               (if (expval->bool (value-of exp1 env))
                   (value-of exp2 env)
                   (value-of exp3 env)))
-      (var-exp (var)
-               (apply-env env var))
       (let-exp (op vars exps body)
                ((let-operator op) vars exps body env))
-      #| (let-exp (var exp1 body) |#
-      #|          (value-of body (extend-env var |#
-      #|                                     (value-of exp1 env) |#
-      #|                                     env))) |#
-      (binaryop-exp (op exp1 exp2)
-                    ((binary-operator op) exp1 exp2 env))
-      (unaryop-exp (op exp1)
-                   ((unary-operator op) exp1 env))
-      (noneop-exp (op)
-                  ((none-operator op) env))
       (cond-exp (exps1 exps2)
                 (cond-operator exps1 exps2 env))
       (unpack-exp (vars exp1 exp2)
                   (unpack-operator vars exp1 exp2 env))
       (proc-exp (vars body)
                 (proc-val (procedure vars body env)))
-      (call-exp (rator rands)
-                (apply-procedure (expval->proc (value-of rator env))
-                                 (for-each-list rands
-                                                (lambda (rand)
-                                                  (value-of rand env)))))
+      (call-exp (exp1 rands)
+                (let ((rator (value-of exp1 env)))
+                  (cases expval rator
+                    (proc-val (proc)
+                              (apply-procedure proc
+                                               (for-each-list rands
+                                                              (lambda (rand)
+                                                                (value-of rand env)))))
+                    (innerop-val (innerop)
+                                 (cases inner-operator innerop
+                                   (none-op (op)
+                                            ((none-operator op) env))
+                                   (binary-op (op)
+                                              ((binary-operator op) (car rands) (cadr rands) env))
+                                   (unary-op (op)
+                                             ((unary-operator op) (car rands) env))))
+                    (else
+                     (eopl:error 'call-exp "can not apply on expval ~s" rator))
+                    )))
       )))
-
 (define make-arithmetic-op
   (lambda (op)
     (lambda (exp1 exp2 env)
