@@ -11,6 +11,9 @@
 (define explist-extractor-error
   (lambda (val)
     (eopl:error 'explist-extractors "expected: pair? given: ~s" val)))
+(define expenv-extractor-error
+  (lambda (var exp1)
+    (eopl:error 'expenv-extractors "unbind var ~s in ~s" var exp1)))
 
 #| Syntax data types for the LET language |#
 (define scanner-spec-let
@@ -147,7 +150,8 @@
 (define procedure
   (lambda (vars body env)
     (lambda (vals)
-      (value-of body (extend-env* vars vals env)))))
+      (let ((env (extract-freevar-env vars body env (empty-env))))
+        (value-of body (extend-env* vars vals env))))))
 ;; Proc * Val -> ExpVal
 (define apply-procedure
   (lambda (proc vals)
@@ -201,9 +205,9 @@
                   (cases expval rator
                     (proc-val (proc)
                               (apply-procedure proc
-                                               (for-each-list rands
-                                                              (lambda (rand)
-                                                                (value-of rand env)))))
+                                               (map (lambda (rand)
+                                                      (value-of rand env))
+                                                    rands)))
                     (innerop-val (innerop)
                                  (cases inner-operator innerop
                                    (none-op (op)
@@ -294,6 +298,55 @@
   (lambda (vars exp1 exp2 env)
     (let ((elst (expval->list (value-of exp1 env))))
       (value-of exp2 (extend-env-from-elist vars elst env)))))
+(define extract-freevar-env-from-explist
+  (lambda (bindvars exps env nenv)
+    (foldl (lambda(exp nenv)
+             (extract-freevar-env bindvars exp env nenv))
+           nenv
+           exps)))
+(define extract-freevar-env-from-let*
+  (lambda (bindvars vars exps env nenv)
+    (if (null? vars) nenv
+        (let ((new-bindvars (if (list-member? (car vars) bindvars)
+                                bindvars
+                                (cons (car vars) bindvars))))
+          (extract-freevar-env-from-let* new-bindvars
+                                         (cdr vars)
+                                         (cdr exps)
+                                         env
+                                         (extract-freevar-env bindvars (car exps) env nenv))))))
+(define extract-freevar-env
+  (lambda (bind-vars exp1 env nenv)
+    (cases expression exp1
+      (var-exp (var)
+               (if (and
+                    (not (list-member? var bind-vars))
+                    (not (has-binding? nenv var)))
+                   (if (has-binding? env var)
+                       (extend-env var (apply-env env var) nenv)
+                       (expenv-extractor-error var exp1))
+                   nenv))
+      (if-exp (exp1 exp2 exp3)
+              (extract-freevar-env bind-vars exp3 env
+                                   (extract-freevar-env bind-vars exp2 env
+                                                        (extract-freevar-env bind-vars exp1 env nenv))))
+      (let-exp (let-op vars exps1 exp2)
+               (let ((nenv (if (equal? let-op "let")
+                               (extract-freevar-env-from-explist bind-vars exps1 env nenv)
+                               (extract-freevar-env-from-let* bind-vars vars exps1 env nenv))))
+                 (extract-freevar-env (append bind-vars vars) exp2 env nenv)))
+      (cond-exp (exps1 exps2)
+                (extract-freevar-env-from-explist bind-vars exps2 env
+                                                  (extract-freevar-env-from-explist bind-vars exps1 env nenv)))
+      (unpack-exp (vars exp1 exp2)
+                  (extract-freevar-env (append bind-vars vars) exp2 env
+                                       (extract-freevar-env bind-vars exp1 env nenv)))
+      (proc-exp (vars exp1)
+                (extract-freevar-env (append bind-vars vars) exp1 env nenv))
+      (call-exp (exp1 exps2)
+                (extract-freevar-env-from-explist bind-vars exps2 env
+                                                  (extract-freevar-env bind-vars exp1 env nenv)))
+      (else nenv))))
 (define make-fun-table
   (lambda lst
     (lambda (op)
@@ -326,3 +379,29 @@
    (cons "let" (let-op let-extend-env))
    (cons "let*" (let-op let*-extend-env))
    ))
+
+(define makemult-test
+  "let makemult = proc (maker)
+                   proc (x)
+                    if (zero? x) then 0
+                      else (- ((maker maker) (- x 1)) (- 0 4))
+  in let times4 = proc(x) ((makemult makemult) x)
+     in (times4 3)")
+(define factorial-test
+  "let makefact = proc(maker)
+                    proc(x)
+                      if (zero? (- x 1)) then 1
+                        else (* x ((maker maker) (- x 1)))
+  in let fact = proc(x) ((makefact makefact) x)
+    in (fact 3)")
+(define makerec-test
+  "let makerec = proc(f)
+                  let d = proc(g)proc(x) ((f (g g)) x)
+                  in (d d)
+   in let makefact = proc(f)
+                      proc(x)
+                       if (zero? (- x 1)) then 1
+                          else (* x (f (- x 1)))
+      in let fact = (makerec makefact)
+        in (fact 3)")
+(run makerec-test)

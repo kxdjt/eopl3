@@ -21,8 +21,9 @@
                  (mark-leaves-with-red-depth-imp rbs1 (+ depth 1))
                  (mark-leaves-with-red-depth-imp rbs2 (+ depth 1))))
       (blue-node (rbss)
-                 (blue-node (for-each-list rbss (lambda (rbs)
-                                                  (mark-leaves-with-red-depth-imp rbs depth)))))
+                 (blue-node (map  (lambda (rbs)
+                                    (mark-leaves-with-red-depth-imp rbs depth))
+                                  rbss)))
       (leaf-node (ival)
                  (leaf-node depth)))))
 (define mark-leaves-with-red-depth

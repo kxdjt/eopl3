@@ -1,6 +1,6 @@
 #lang racket
 
-(provide empty-env empty-env? extend-env apply-env extend-env*)
+(provide empty-env empty-env? extend-env apply-env extend-env* has-binding?)
 
 (define empty-env
   (lambda ()

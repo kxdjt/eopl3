@@ -197,10 +197,11 @@
                  (explist->null? elist))
       (list-exp (exps)
                 (list-val
-                 (fold-list exps cons-val empty-list
-                            (lambda (exp)
-                              (value-of exp env)))))
-
+                 (foldl (lambda (exp res)
+                          (cons-val (value-of exp env) res))
+                        (empty-list)
+                        exps)
+                 ))
       )))
 (define exp
   (let-exp 'y (const-exp 5) (diff-exp (var-exp 'x) (var-exp 'y))))

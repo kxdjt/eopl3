@@ -33,9 +33,10 @@
          ((and (not (null? (cdr datum)))
                (list? (cadr datum)))
           (app-exp (parse-expression (car datum))
-                   (for-each-list (cadr datum)
-                                  (lambda (var)
-                                    (parse-expression var)))))
+                   (map
+                    (lambda (var)
+                      (parse-expression var))
+                    (cadr datum))))
          (else
           (error 'parse-expression
                  "~s is invalid form" datum)))))))
