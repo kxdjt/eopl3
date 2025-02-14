@@ -1,8 +1,11 @@
 #lang racket
 
 (require (except-in eopl list-of))
-(require "ch2-ribcage-env.rkt")
+#| (require "ch2-ribcage-env.rkt") |#
+(require "ch3-enironment.rkt")
 (require "ch2-datatype-utils.rkt")
+
+(provide run)
 
 (define expval-extractor-error
   (lambda (variant value)
@@ -18,12 +21,13 @@
 #| Syntax data types for the LET language |#
 (define scanner-spec-let
   '((white-sp (whitespace) skip)
-    (number (digit (arbno digit)) number)
+    (number ((or digit (concat "-" digit)) (arbno digit)) number)
     (identifier (letter (arbno (or letter digit "?"))) symbol)
     (binary-op ((or "+" "-" "*" "/" "equal?" "greater?" "less?" "cons")) string)
     (unary-op ((or "minus" "zero?" "car" "cdr" "null?")) string)
     (none-op ((or "emptylist")) string)
     (let-op ((or "let" "let*")) string)
+    (proc-op ((or "proc" "traceproc" "dyproc")) string)
     ))
 (define grammar-let
   '((program (expression) a-program)
@@ -33,6 +37,9 @@
     ;;Expression ::= let-op {identifier = expression}* in expression
     ;;              let-exp (op ids exps1 exp)
     (expression (let-op  (arbno identifier "=" expression )  "in" expression) let-exp)
+    ;;Expression ::= letrec {identifier ({identifier}*) = expression}* in expression
+    ;;               letrec-exp (proc-names list-of-vars exps1 exp2
+    (expression ( "letrec" (arbno identifier "(" (arbno identifier) ")" "=" expression) "in" expression) letrec-exp)
     ;;Expression ::= cond { experssion ==> expression }* end
     ;;               cond-exp (list-of-cond list-of-exp)
     (expression ( "cond" "{" (arbno expression "==>" expression) "}") cond-exp)
@@ -41,7 +48,7 @@
     (expression ( "unpack" (arbno identifier) "=" expression "in" expression) unpack-exp)
     ;;Expression ::= proc {identifier}*(,) expression
     ;;               proc-exp (vars body)
-    (expression ( "proc" "(" (separated-list identifier ",")  ")" expression) proc-exp)
+    (expression ( proc-op "(" (separated-list identifier ",")  ")" expression) proc-exp)
     ;;Expression ::= (expression {expression}* )
     ;;               call-exp (rator rands)
     (expression ( "(" expression (arbno expression) ")" ) call-exp)
@@ -149,16 +156,60 @@
 ;; Define procedure data type by scheme procedure
 (define procedure
   (lambda (vars body env)
-    (lambda (vals)
+    (lambda (vals . _)
       (let ((env (extract-freevar-env vars body env (empty-env))))
         (value-of body (extend-env* vars vals env))))))
+(define traceproc
+  (lambda (vars body env)
+    (lambda (vals . _)
+      (printf "tranceproc: vars:~s vals:~s body:~s\n" vars vals body)
+      (let ((env (extract-freevar-env vars body env (empty-env))))
+        (let ((res (value-of body (extend-env* vars vals env))))
+          (printf "tranceproc: res: ~s\n" res)
+          res)))))
+(define dynamicproc
+  (lambda (vars body . _)
+    (lambda (vals env)
+      (value-of body (extend-env* vars vals env)))))
 ;; Proc * Val -> ExpVal
 (define apply-procedure
-  (lambda (proc vals)
-    (proc vals)))
+  (lambda (proc vals env)
+    (proc vals env)))
 (define proc?
   (lambda (proc)
     (procedure? proc)))
+
+(define extend-env-rec*
+  (lambda (proc-names list-of-vars exps env)
+    (cons
+     (lambda (search-var)
+       (let ((res (ormap (lambda(proc-name vars exp1)
+                           (if (equal? search-var proc-name)
+                               (proc-val (procedure vars exp1
+                                                    (extend-env-rec* proc-names list-of-vars exps env)))
+                               #f))
+                         proc-names
+                         list-of-vars
+                         exps)))
+         (if (not res)
+             (apply-env env search-var)
+             res)))
+     (lambda (search-var)
+       (if (list-member? search-var proc-names)
+           #t
+           (has-binding? env search-var))))))
+(define extend-env-rec
+  (lambda (proc-name vars exp1 env)
+    (cons
+     (lambda (search-var)
+       (if (equal? search-var proc-name)
+           (proc-val (procedure vars exp1
+                                (extend-env-rec proc-name vars exp1 env)))
+           (apply-env env search-var)))
+     (lambda (search-var)
+       (if (equal? proc-name search-var)
+           #t
+           (has-binding? env search-var))))))
 
 #| Interpreter for the LET language |#
 ;; run : string -> ExpVal
@@ -194,12 +245,16 @@
                   (value-of exp3 env)))
       (let-exp (op vars exps body)
                ((let-operator op) vars exps body env))
+      (letrec-exp (proc-names list-of-vars exps1 exp2)
+                  (value-of
+                   exp2
+                   (extend-env-rec* proc-names list-of-vars exps1 env)))
       (cond-exp (exps1 exps2)
                 (cond-operator exps1 exps2 env))
       (unpack-exp (vars exp1 exp2)
                   (unpack-operator vars exp1 exp2 env))
-      (proc-exp (vars body)
-                (proc-val (procedure vars body env)))
+      (proc-exp (op vars body)
+                (proc-val ((proc-operator op) vars body env)))
       (call-exp (exp1 rands)
                 (let ((rator (value-of exp1 env)))
                   (cases expval rator
@@ -207,7 +262,8 @@
                               (apply-procedure proc
                                                (map (lambda (rand)
                                                       (value-of rand env))
-                                                    rands)))
+                                                    rands)
+                                               env))
                     (innerop-val (innerop)
                                  (cases inner-operator innerop
                                    (none-op (op)
@@ -341,7 +397,7 @@
       (unpack-exp (vars exp1 exp2)
                   (extract-freevar-env (append bind-vars vars) exp2 env
                                        (extract-freevar-env bind-vars exp1 env nenv)))
-      (proc-exp (vars exp1)
+      (proc-exp (op vars exp1)
                 (extract-freevar-env (append bind-vars vars) exp1 env nenv))
       (call-exp (exp1 exps2)
                 (extract-freevar-env-from-explist bind-vars exps2 env
@@ -379,29 +435,9 @@
    (cons "let" (let-op let-extend-env))
    (cons "let*" (let-op let*-extend-env))
    ))
-
-(define makemult-test
-  "let makemult = proc (maker)
-                   proc (x)
-                    if (zero? x) then 0
-                      else (- ((maker maker) (- x 1)) (- 0 4))
-  in let times4 = proc(x) ((makemult makemult) x)
-     in (times4 3)")
-(define factorial-test
-  "let makefact = proc(maker)
-                    proc(x)
-                      if (zero? (- x 1)) then 1
-                        else (* x ((maker maker) (- x 1)))
-  in let fact = proc(x) ((makefact makefact) x)
-    in (fact 3)")
-(define makerec-test
-  "let makerec = proc(f)
-                  let d = proc(g)proc(x) ((f (g g)) x)
-                  in (d d)
-   in let makefact = proc(f)
-                      proc(x)
-                       if (zero? (- x 1)) then 1
-                          else (* x (f (- x 1)))
-      in let fact = (makerec makefact)
-        in (fact 3)")
-(run makerec-test)
+(define proc-operator
+  (make-fun-table
+   (cons "proc" procedure)
+   (cons "traceproc" traceproc)
+   (cons "dyproc" dynamicproc)
+   ))

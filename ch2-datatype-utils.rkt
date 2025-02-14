@@ -1,6 +1,6 @@
 #lang racket
 
-(provide list-of for-each-list debug-fun fold-list)
+(provide list-of list-member? debug-fun)
 
 (define list-of
   (lambda (pred)
@@ -9,18 +9,23 @@
           (and (pair? var)
                (pred (car var))
                ((list-of pred) (cdr var)))))))
-(define for-each-list
-  (lambda (lst fun)
+(define foldr
+  (lambda (fun lst init-res)
     (if (null? lst)
-        '()
-        (cons (fun (car lst))
-              (for-each-list (cdr lst) fun)))))
-(define fold-list
-  (lambda (lst fold-fun fold-term-fun fun)
-    (let ((fold (lambda(slst) (fold-list slst fold-fun fold-term-fun fun))))
-      (if (null? lst)
-          (fold-term-fun)
-          (fold-fun (fun (car lst)) (fold (cdr lst)))))))
+        init-res
+        (fun (car lst) (foldr fun (cdr lst) init-res)))))
+(define foldl
+  (lambda (fun lst init-res)
+    (if (null? lst)
+        init-res
+        (foldl fun (cdr lst) (fun (car lst) init-res)))))
+(define list-member?
+  (lambda (search-v lst)
+    (if (null? lst)
+        #f
+        (if (equal? search-v (car lst))
+            #t
+            (list-member? search-v (cdr lst))))))
 (define forward
   (lambda (x . xs)
     x))
