@@ -1,7 +1,8 @@
 #lang racket
 
-(require "ch3-lexical-addressing-trimmed.rkt")
-#| (require "ch3-lexaddr-trimmed-trans.rkt") |#
+#| (require "ch3-lexical-addressing-trimmed.rkt") |#
+#| (require "ch3-lexical-addressing.rkt") |#
+(require "ch3-translate-known-proc.rkt")
 
 (define makemult-test
   "let makemult = proc (maker)
@@ -78,4 +79,8 @@
                  else ((g g) (+ x 1) (- y 1))
        in let plus = (makeplus makeplus)
           in (plus 3 4)")
+(define known-proc-test
+  "let x = 3
+    in let f = proc (y) (- y x)
+              in (f 13)")
 #| (run traceproc-test) |#

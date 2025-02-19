@@ -1,8 +1,15 @@
 #lang racket
 
-(provide list-of list-member? debug-fun printf-hlmsg debug-info)
+(provide list-of list-member? remove-by-idx debug-fun printf-hlmsg debug-info)
 
 (define DEBUG #t)
+
+(define remove-by-idx
+  (lambda (lst idx)
+    (if (equal? idx 0)
+        (cdr lst)
+        (cons (car lst)
+              (remove-by-idx (cdr lst) (- idx 1))))))
 
 (define list-of
   (lambda (pred)
