@@ -232,8 +232,8 @@
   (lambda (senv vars)
     (if (null? vars)
         senv
-        (extend-senv* (extend-senv senv (car vars))
-                      (cdr vars)))))
+        (extend-senv (extend-senv* senv (cdr vars))
+                     (car vars)))))
 (define apply-senv
   (lambda (senv var)
     (debug-info "apply-senv" "senv:~s var:~s\n" senv var)
