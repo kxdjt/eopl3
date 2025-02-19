@@ -1,6 +1,7 @@
 #lang racket
 
-(require "ch3-let-with-sllgen.rkt")
+(require "ch3-lexical-addressing-trimmed.rkt")
+#| (require "ch3-lexaddr-trimmed-trans.rkt") |#
 
 (define makemult-test
   "let makemult = proc (maker)
@@ -48,6 +49,33 @@
          in let a = 5
             in (f 2)")
 (define letrec-test
-  " letrec double(x) = if (zero? x) then 0 else (- (double (- x 1)) -2)
-    in (double 6)")
-(run letrec-test)
+  " letrec double(x y) = if (zero? x) then 0 else (- (double (- x 1) y) y)
+    in (double 6 -2)")
+(define letrec-test2
+  "letrec
+          even(x) = if (zero? x) then 1 else (odd (- x 1))
+          odd(x) = if (zero? x) then 0 else (even (- x 1))
+  in (odd 13)")
+(define dymanic-rec-test1
+  " let fact = proc (n) (+ n 1)
+    in let fact = proc (n)
+                    if (zero? n)
+                    then 1
+                    else (* n (fact (- n 1)))
+        in (fact 5)")
+(define dymanic-rec-test2
+  " let fact = dyproc (n) (+ n 1)
+    in let fact = dyproc (n)
+                    if (zero? n)
+                    then 1
+                    else (* n (fact (- n 1)))
+        in (fact 5)")
+(define multi-args-lexical-addr-test
+  "let makeplus = proc(g)
+                proc (x , y)
+                 if (zero? y)
+                 then x
+                 else ((g g) (+ x 1) (- y 1))
+       in let plus = (makeplus makeplus)
+          in (plus 3 4)")
+#| (run traceproc-test) |#

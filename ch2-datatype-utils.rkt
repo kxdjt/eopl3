@@ -1,6 +1,8 @@
 #lang racket
 
-(provide list-of list-member? debug-fun)
+(provide list-of list-member? debug-fun printf-hlmsg debug-info)
+
+(define DEBUG #t)
 
 (define list-of
   (lambda (pred)
@@ -38,3 +40,13 @@
       (lambda (args-print)
         (res (fun args))))
     (g (printf "~s: args: ~s\n" fun args))))
+(define printf-hlmsg
+  (lambda (key form . vars)
+    (apply printf
+           (string-append "\x1b[34m" key "\x1b[0m" ": " form)
+           vars)))
+(define debug-info
+  (lambda (key form . vars)
+    (if DEBUG
+        (apply printf-hlmsg key form vars)
+        'none)))
