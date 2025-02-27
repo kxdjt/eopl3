@@ -2,7 +2,8 @@
 
 #| (require "ch3-lexical-addressing-trimmed.rkt") |#
 #| (require "ch3-lexical-addressing.rkt") |#
-(require "ch3-translate-known-proc.rkt")
+#| (require "ch3-translate-known-proc.rkt") |#
+(require "ch4-store-passing-explicit-refs.rkt")
 
 (define makemult-test
   "let makemult = proc (maker)
@@ -83,4 +84,10 @@
   "let x = 3
     in let f = proc (y) (- y x)
               in (f 13)")
-#| (run traceproc-test) |#
+(define explicit-refs-test
+  "let ref = newref(3)
+   in begin
+        deref(ref);
+        setref(ref,5);
+        (+ 1 deref(ref))
+      end")
