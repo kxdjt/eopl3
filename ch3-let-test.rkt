@@ -3,7 +3,8 @@
 #| (require "ch3-lexical-addressing-trimmed.rkt") |#
 #| (require "ch3-lexical-addressing.rkt") |#
 #| (require "ch3-translate-known-proc.rkt") |#
-(require "ch4-store-passing-explicit-refs.rkt")
+#| (require "ch4-store-passing-explicit-refs.rkt") |#
+(require "ch4-store-passing-implicit-refs.rkt")
 
 (define makemult-test
   "let makemult = proc (maker)
@@ -91,3 +92,31 @@
         setref(ref,5);
         (+ 1 deref(ref))
       end")
+(define implicit-refs-test
+  " let x = 0
+    in letrec even(dummy)
+                  = if (zero? x)
+                    then 1
+                    else begin
+                            set x = (- x 1);
+                            (odd 888)
+                          end
+              odd(dummy)
+                  = if (zero? x)
+                    then 0
+                    else begin
+                          set x = (- x 1);
+                          (even 888)
+                        end
+      in begin set x = 13; (odd -888) end")
+(define implicit-refs-test2
+  "let g = let count = 0
+            in proc (dummy)
+                begin
+                set count =(- count -1);
+                count
+                end
+    in let a = (g 11)
+        in let b = (g 11)
+            in (- a b)")
+
