@@ -4,7 +4,8 @@
 #| (require "ch3-lexical-addressing.rkt") |#
 #| (require "ch3-translate-known-proc.rkt") |#
 #| (require "ch4-store-passing-explicit-refs.rkt") |#
-(require "ch4-store-passing-implicit-refs.rkt")
+#| (require "ch4-store-passing-implicit-refs.rkt") |#
+(require "ch4-implicit-mutable-ref.rkt")
 
 (define makemult-test
   "let makemult = proc (maker)
@@ -119,4 +120,21 @@
     in let a = (g 11)
         in let b = (g 11)
             in (- a b)")
-
+(define implicit-refs-test3
+  "let times4 = 0
+      in begin
+          set times4 = proc (x)
+                        if (zero? x)
+                        then 0
+                        else (- (times4 (- x 1)) -4);
+          (times4 3)
+        end")
+(define implicit-refs-test4
+  "letmutable times4 = 0
+      in begin
+          set times4 = proc (x)
+                        if (zero? x)
+                        then 0
+                        else (- (times4 (- x 1)) -4);
+          (times4 3)
+        end")
