@@ -2,7 +2,7 @@
 
 (provide list-of list-member? remove-by-idx debug-fun printf-hlmsg debug-info)
 
-(define DEBUG #t)
+(define DEBUG #f)
 
 (define remove-by-idx
   (lambda (lst idx)

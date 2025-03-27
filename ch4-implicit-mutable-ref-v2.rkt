@@ -56,6 +56,8 @@
     ;;-----------Store Interface------------------
     ;;Expression ::= set identifier = expression
     (expression ("set" identifier "=" expression) set-exp)
+    ;;Expression ::= setdynamic identifier = expression during expression
+    (expression ("setdynamic" identifier "=" expression "during" expression) setdynamic-exp)
     ))
 
 (sllgen:make-define-datatypes scanner-spec-let grammar-let)
@@ -89,11 +91,21 @@
 
 ;; Define Env Value
 (define-datatype envval envval?
-  (mutable-val
+  (an-env-val
+   (mutable boolean?)
    (ref number?))
-  (immutable-val
-   (eval expval?))
   )
+
+(define mutable-val
+  (lambda (eval)
+    (an-env-val
+     true
+     eval)))
+(define immutable-val
+  (lambda (eval)
+    (an-env-val
+     false
+     eval)))
 
 ;; Define Expressed valus
 (define-datatype expval expval?
@@ -264,29 +276,25 @@
 ;; var*expval*(env . store) -> (newenv . newstore)
 (define extend-senv
   (lambda (var eval senv)
+    (extend-senv-imp var
+                     eval
+                     senv
+                     extend-env-mutable)))
+(define extend-senv-immutable
+  (lambda (var eval senv)
+    (extend-senv-imp var
+                     eval
+                     senv
+                     extend-env-immutable)))
+(define extend-senv-imp
+  (lambda (var eval senv extend-env-fun)
     (let* ((env (car senv))
            (store (cdr senv))
            (ref (store->nextref store)))
       (cons
-       (extend-env-mutable var ref env)
+       (extend-env-fun var ref env)
        (extend-store ref eval store)))))
-(define extend-senv-immutable
-  (lambda (var eval senv)
-    (let* ((env (car senv))
-           (store (cdr senv)))
-      (cons
-       (extend-env-immutable var eval env)
-       store))))
 ;; vars**expval*(env . store) -> (newenv . newstore)
-(define extend-senv*-imp
-  (lambda (extend-fun vars evals senv)
-    (if (null? vars)
-        senv
-        (extend-senv*-imp extend-fun
-                          (cdr vars) (cdr evals)
-                          (extend-fun (car vars)
-                                      (car evals)
-                                      senv)))))
 (define extend-senv*
   (lambda (vars evals senv)
     (extend-senv*-imp extend-senv
@@ -299,6 +307,15 @@
                       vars
                       evals
                       senv)))
+(define extend-senv*-imp
+  (lambda (extend-fun vars evals senv)
+    (if (null? vars)
+        senv
+        (extend-senv*-imp extend-fun
+                          (cdr vars) (cdr evals)
+                          (extend-fun (car vars)
+                                      (car evals)
+                                      senv)))))
 ;; (env . store)*var -> val
 (define apply-senv
   (lambda (senv var)
@@ -306,10 +323,8 @@
            (store (cdr senv))
            (env-val (apply-env env var)))
       (cases envval env-val
-        (mutable-val (ref)
-                     (store->findref store ref))
-        (immutable-val (eval)
-                       eval)
+        (an-env-val (mutable ref)
+                    (store->findref store ref))
         ))))
 ;; Define Answer -- include expval and store
 (define-datatype answer answer?
@@ -373,6 +388,8 @@
                    (begin-operator exp1 exps2 store env))
         (set-exp (ident exp1)
                  (set-operator ident exp1 senv))
+        (setdynamic-exp (ident exp1 exp2)
+                        (setdy-operator ident exp1 exp2 senv))
         ))))
 
 
@@ -436,39 +453,28 @@
    (cons "letmutable" (let-op let-extend-env))
    (cons "letmutable*" (let-op let*-extend-env))
    ))
-(define extend-senv-rec*-immutable
-  (lambda (proc-names list-of-vars exps senv)
-    (let ((env (car senv))
-          (store (cdr senv)))
-      (define make-env
-        (cons
-         (lambda (s-var)
-           (let ((res (ormap (lambda(proc-name vars exp1)
-                               (if (equal? s-var proc-name)
-                                   (immutable-val (proc-val (procedure vars exp1
-                                                                       make-env)))
-                                   #f))
-                             proc-names
-                             list-of-vars
-                             exps)))
-             (if (not res)
-                 (apply-env env s-var)
-                 res)))
-         (lambda (s-var)
-           (if (list-member? s-var proc-names)
-               #t
-               (has-binding? env s-var)))))
-      (cons
-       make-env
-       store))))
 (define extend-senv-rec*
   (lambda (proc-names list-of-vars exps senv)
+    (extend-senv-rec*-imp proc-names
+                          list-of-vars
+                          exps
+                          senv
+                          extend-env-mutable)))
+(define extend-senv-rec*-immutable
+  (lambda (proc-names list-of-vars exps senv)
+    (extend-senv-rec*-imp proc-names
+                          list-of-vars
+                          exps
+                          senv
+                          extend-env-immutable)))
+(define extend-senv-rec*-imp
+  (lambda (proc-names list-of-vars exps senv extend-env-fun)
     (define make-env
       (lambda (vars s-ref env)
         (if (null? vars)
             env
             (make-env (cdr vars) (+ s-ref 1)
-                      (extend-env-mutable (car vars) s-ref env)))))
+                      (extend-env-fun (car vars) s-ref env)))))
     (define make-store
       (lambda (lvars exps s-ref env store)
         (if (null? exps)
@@ -621,12 +627,32 @@
            (val (answer->eval aw))
            (env-val (apply-env (car senv) ident)))
       (cases envval env-val
-        (mutable-val (ref)
-                     (an-answer
-                      val
-                      (store->setref
-                       (answer->store aw)
-                       ref
-                       val)))
-        (else
-         (eopl:error 'set-opt "invalid type for envval ~s:~s" ident env-val))))))
+        (an-env-val (mutable ref)
+                    (if mutable
+                        (an-answer
+                         val
+                         (store->setref
+                          (answer->store aw)
+                          ref
+                          val))
+                        (eopl:error 'set-opt "invalid type for envval ~s:~s" ident env-val)))))))
+
+(define setdy-operator
+  (lambda (ident exp1 exp2 senv)
+    (let* ((env (car senv))
+           (ref (cases envval (apply-env env ident)
+                  (an-env-val (mutable ref) ref)))
+           (old-val (store->findref (cdr senv) ref))
+           (aw (value-of exp1 senv))
+           (res-aw (value-of exp2
+                             (cons env
+                                   (store->setref
+                                    (answer->store aw)
+                                    ref
+                                    (answer->eval aw))))))
+      (an-answer
+       (answer->eval res-aw)
+       (store->setref
+        (answer->store res-aw)
+        ref
+        old-val)))))

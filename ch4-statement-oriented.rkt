@@ -21,13 +21,14 @@
     (number ((or digit (concat "-" digit)) (arbno digit)) number)
     (identifier (letter (arbno (or letter digit "?"))) symbol)
     (binary-op ((or "+" "-" "*" "/" "equal?" "greater?" "less?" "cons")) string)
-    (unary-op ((or "minus" "zero?" "car" "cdr" "null?")) string)
+    (unary-op ((or "not" "minus" "zero?" "car" "cdr" "null?")) string)
     (none-op ((or "emptylist")) string)
     (let-op ((or "let" "let*" "letmutable" "letmutable*")) string)
     (proc-op ((or "proc" "traceproc" "dyproc")) string)
     ))
 (define grammar-let
-  '((program (expression) a-program)
+  '((program (statement) a-program)
+    ;;-----------Expression Interface------------------
     (expression (number) const-exp)
     (expression ("if" expression "then" expression "else" expression) if-exp)
     (expression (identifier) var-exp)
@@ -56,6 +57,23 @@
     ;;-----------Store Interface------------------
     ;;Expression ::= set identifier = expression
     (expression ("set" identifier "=" expression) set-exp)
+    ;;Expression ::= setdynamic identifier = expression during expression
+    (expression ("setdynamic" identifier "=" expression "during" expression) setdynamic-exp)
+    ;;-----------Statement Interface--------------
+    ;;Statement ::= identifier = expression
+    (statement (identifier "=" expression) assign-stmt)
+    ;;Statement ::= print expression
+    (statement ("print" expression) print-stmt)
+    ;;Statement ::= {{statement}*(;)}
+    (statement ( "{" (separated-list statement ";") "}") order-stmt)
+    ;;Statement ::= if expression statement statement
+    (statement ( "if" expression statement statement) if-stmt)
+    ;;Statement ::= while expression statement
+    (statement ( "while" expression statement) while-stmt)
+    ;;Statement ::= do statement while experssion
+    (statement ( "do" statement "while" expression) do-while-stmt)
+    ;;Statement ::= var {identifier}*(,) ; statement
+    (statement ( "var" (separated-list identifier ",") ";" statement) block-stmt)
     ))
 
 (sllgen:make-define-datatypes scanner-spec-let grammar-let)
@@ -70,7 +88,7 @@
 ;; run : string -> ExpVal
 (define run
   (lambda (string)
-    (value-of-program (scan&parse string))))
+    (result-of-program (scan&parse string))))
 (define init-senv
   (lambda ()
     (extend-senv 'i (num-val 1)
@@ -78,22 +96,31 @@
                               (extend-senv 'x (num-val 10)
                                            (empty-senv))))))
 
-;; Program -> ExpVal
-(define value-of-program
+;; Program -> none
+(define result-of-program
   (lambda (pgm)
     (cases program pgm
-      (a-program (exp1)
-                 (cases answer (value-of exp1 (init-senv))
-                   (an-answer (eval store)
-                              eval))))))
+      (a-program (stmt)
+                 (result-of stmt (init-senv))
+                 "run success!"))))
 
 ;; Define Env Value
 (define-datatype envval envval?
-  (mutable-val
+  (an-env-val
+   (mutable boolean?)
    (ref number?))
-  (immutable-val
-   (eval expval?))
   )
+
+(define mutable-val
+  (lambda (eval)
+    (an-env-val
+     true
+     eval)))
+(define immutable-val
+  (lambda (eval)
+    (an-env-val
+     false
+     eval)))
 
 ;; Define Expressed valus
 (define-datatype expval expval?
@@ -252,9 +279,9 @@
                 (mutable-val ref)
                 env)))
 (define extend-env-immutable
-  (lambda (var eval env)
+  (lambda (var ref env)
     (extend-env var
-                (immutable-val eval)
+                (immutable-val ref)
                 env)))
 
 ;; Define senv -- (env . store)
@@ -264,29 +291,25 @@
 ;; var*expval*(env . store) -> (newenv . newstore)
 (define extend-senv
   (lambda (var eval senv)
+    (extend-senv-imp var
+                     eval
+                     senv
+                     extend-env-mutable)))
+(define extend-senv-immutable
+  (lambda (var eval senv)
+    (extend-senv-imp var
+                     eval
+                     senv
+                     extend-env-immutable)))
+(define extend-senv-imp
+  (lambda (var eval senv extend-env-fun)
     (let* ((env (car senv))
            (store (cdr senv))
            (ref (store->nextref store)))
       (cons
-       (extend-env-mutable var ref env)
+       (extend-env-fun var ref env)
        (extend-store ref eval store)))))
-(define extend-senv-immutable
-  (lambda (var eval senv)
-    (let* ((env (car senv))
-           (store (cdr senv)))
-      (cons
-       (extend-env-immutable var eval env)
-       store))))
 ;; vars**expval*(env . store) -> (newenv . newstore)
-(define extend-senv*-imp
-  (lambda (extend-fun vars evals senv)
-    (if (null? vars)
-        senv
-        (extend-senv*-imp extend-fun
-                          (cdr vars) (cdr evals)
-                          (extend-fun (car vars)
-                                      (car evals)
-                                      senv)))))
 (define extend-senv*
   (lambda (vars evals senv)
     (extend-senv*-imp extend-senv
@@ -299,6 +322,31 @@
                       vars
                       evals
                       senv)))
+#| (define extend-senv*-imp |#
+#|   (lambda (extend-fun vars evals senv) |#
+#|     (if (null? vars) |#
+#|         senv |#
+#|         (extend-senv*-imp extend-fun |#
+#|                           (cdr vars) (cdr evals) |#
+#|                           (extend-fun (car vars) |#
+#|                                       (car evals) |#
+#|                                       senv))))) |#
+(define extend-senv*-imp
+  (lambda (extend-fun vars evals senv)
+    (if (null? vars)
+        senv
+        (let* ((is-uninit (null? evals))
+               (next-evals (if is-uninit
+                               evals
+                               (cdr evals)))
+               (eval (if is-uninit
+                         (num-val 0)
+                         (car evals))))
+          (extend-senv*-imp extend-fun
+                            (cdr vars) next-evals
+                            (extend-fun (car vars)
+                                        eval
+                                        senv))))))
 ;; (env . store)*var -> val
 (define apply-senv
   (lambda (senv var)
@@ -306,10 +354,8 @@
            (store (cdr senv))
            (env-val (apply-env env var)))
       (cases envval env-val
-        (mutable-val (ref)
-                     (store->findref store ref))
-        (immutable-val (eval)
-                       eval)
+        (an-env-val (mutable ref)
+                    (store->findref store ref))
         ))))
 ;; Define Answer -- include expval and store
 (define-datatype answer answer?
@@ -325,6 +371,7 @@
     (cases answer aw
       (an-answer (_ s) s))))
 
+;; expression * senv -> answer(eval,store)
 (define value-of
   (lambda (exp senv)
     (let* ((env (car senv))
@@ -373,6 +420,8 @@
                    (begin-operator exp1 exps2 store env))
         (set-exp (ident exp1)
                  (set-operator ident exp1 senv))
+        (setdynamic-exp (ident exp1 exp2)
+                        (setdy-operator ident exp1 exp2 senv))
         ))))
 
 
@@ -436,39 +485,28 @@
    (cons "letmutable" (let-op let-extend-env))
    (cons "letmutable*" (let-op let*-extend-env))
    ))
-(define extend-senv-rec*-immutable
-  (lambda (proc-names list-of-vars exps senv)
-    (let ((env (car senv))
-          (store (cdr senv)))
-      (define make-env
-        (cons
-         (lambda (s-var)
-           (let ((res (ormap (lambda(proc-name vars exp1)
-                               (if (equal? s-var proc-name)
-                                   (immutable-val (proc-val (procedure vars exp1
-                                                                       make-env)))
-                                   #f))
-                             proc-names
-                             list-of-vars
-                             exps)))
-             (if (not res)
-                 (apply-env env s-var)
-                 res)))
-         (lambda (s-var)
-           (if (list-member? s-var proc-names)
-               #t
-               (has-binding? env s-var)))))
-      (cons
-       make-env
-       store))))
 (define extend-senv-rec*
   (lambda (proc-names list-of-vars exps senv)
+    (extend-senv-rec*-imp proc-names
+                          list-of-vars
+                          exps
+                          senv
+                          extend-env-mutable)))
+(define extend-senv-rec*-immutable
+  (lambda (proc-names list-of-vars exps senv)
+    (extend-senv-rec*-imp proc-names
+                          list-of-vars
+                          exps
+                          senv
+                          extend-env-immutable)))
+(define extend-senv-rec*-imp
+  (lambda (proc-names list-of-vars exps senv extend-env-fun)
     (define make-env
       (lambda (vars s-ref env)
         (if (null? vars)
             env
             (make-env (cdr vars) (+ s-ref 1)
-                      (extend-env-mutable (car vars) s-ref env)))))
+                      (extend-env-fun (car vars) s-ref env)))))
     (define make-store
       (lambda (lvars exps s-ref env store)
         (if (null? exps)
@@ -557,6 +595,11 @@
            (expval->num val2))
           (bool-val #t)
           (bool-val #f)))))
+(define not-op
+  (lambda (val1)
+    (if (not (expval->bool val1))
+        (bool-val #t)
+        (bool-val #f))))
 (define zero?-op
   (lambda (val1)
     (if (zero? (expval->num val1))
@@ -596,6 +639,7 @@
    ))
 (define unary-operator
   (make-fun-table
+   (cons "not" not-op)
    (cons "zero?" zero?-op)
    (cons "minus" minus-op)
    (cons "car" car-op)
@@ -621,12 +665,135 @@
            (val (answer->eval aw))
            (env-val (apply-env (car senv) ident)))
       (cases envval env-val
-        (mutable-val (ref)
-                     (an-answer
-                      val
-                      (store->setref
-                       (answer->store aw)
-                       ref
-                       val)))
-        (else
-         (eopl:error 'set-opt "invalid type for envval ~s:~s" ident env-val))))))
+        (an-env-val (mutable ref)
+                    (if mutable
+                        (an-answer
+                         val
+                         (store->setref
+                          (answer->store aw)
+                          ref
+                          val))
+                        (eopl:error 'set-opt "invalid type for envval ~s:~s" ident env-val)))))))
+
+(define setdy-operator
+  (lambda (ident exp1 exp2 senv)
+    (let* ((env (car senv))
+           (ref (cases envval (apply-env env ident)
+                  (an-env-val (mutable ref) ref)))
+           (old-val (store->findref (cdr senv) ref))
+           (aw (value-of exp1 senv))
+           (res-aw (value-of exp2
+                             (cons env
+                                   (store->setref
+                                    (answer->store aw)
+                                    ref
+                                    (answer->eval aw))))))
+      (an-answer
+       (answer->eval res-aw)
+       (store->setref
+        (answer->store res-aw)
+        ref
+        old-val)))))
+
+;; statement * senv -> store
+(define result-of
+  (lambda (stmt senv)
+    (let* ((env (car senv))
+           (store (cdr senv)))
+      (debug-info "result-of" "stmt:~s store:~s\n" stmt store)
+      (let ((res (result-of-imp stmt senv)))
+        (debug-info "result-of" "res:~s\n" res)
+        res))))
+
+(define result-of-imp
+  (lambda (stmt senv)
+    (cases statement stmt
+      (assign-stmt (ident exp1)
+                   (assign-handler ident exp1 senv))
+      (print-stmt (exp1)
+                  (print-handler exp1 senv))
+      (order-stmt (stmts)
+                  (order-handler stmts senv))
+      (if-stmt (exp1 stmt1 stmt2)
+               (if-handler exp1 stmt1 stmt2 senv))
+      (while-stmt (exp1 stmt1)
+                  (while-handler exp1 stmt1 senv))
+      (do-while-stmt (stmt1 exp1)
+                     (do-while-handler stmt1 exp1 senv))
+      (block-stmt (idents stmt)
+                  (block-handler idents stmt senv))
+      )))
+
+(define assign-handler
+  (lambda (ident exp1 senv)
+    (let* ((env (car senv))
+           (ref (cases envval (apply-env env ident)
+                  (an-env-val (_ ref) ref)))
+           (aw (value-of exp1 senv)))
+      (store->setref
+       (answer->store aw)
+       ref
+       (answer->eval aw)))))
+
+(define print-handler
+  (lambda (exp1 senv)
+    (let ((aw (value-of exp1 senv)))
+      (printf "print: ~s\n" (answer->eval aw))
+      (answer->store aw))))
+
+(define order-handler
+  (lambda (stmts senv)
+    (let ((env (car senv))
+          (store (cdr senv)))
+      (if (null? stmts)
+          store
+          (order-handler
+           (cdr stmts)
+           (cons env
+                 (result-of (car stmts) senv)))))))
+
+(define if-handler
+  (lambda (exp1 stmt1 stmt2 senv)
+    (let* ((env (car senv))
+           (store (cdr senv))
+           (aw (value-of exp1 senv))
+           (real-stmt ((if (expval->bool (answer->eval aw))
+                           stmt1
+                           stmt2))))
+      (result-of real-stmt
+                 (cons env
+                       (answer->store aw))))))
+
+(define while-handler
+  (lambda (exp1 stmt1 senv)
+    (let* ((env (car senv))
+           (aw (value-of exp1 senv))
+           (store (answer->store aw)))
+      (if (expval->bool (answer->eval aw))
+          (while-handler exp1
+                         stmt1
+                         (cons env
+                               (result-of stmt1
+                                          (cons env
+                                                store))))
+          store))))
+
+(define do-while-handler
+  (lambda (stmt1 exp1 senv)
+    (let* ((env (car senv))
+           (store (result-of stmt1 senv))
+           (aw (value-of exp1 (cons env store)))
+           (new-store (answer->store aw)))
+      (if (expval->bool (answer->eval aw))
+          (do-while-handler
+           stmt1 exp1 (cons env
+                            new-store))
+          new-store))))
+
+(define block-handler
+  (lambda (idents stmt senv)
+    (result-of stmt
+               (extend-senv*
+                idents
+                '()
+                senv))))

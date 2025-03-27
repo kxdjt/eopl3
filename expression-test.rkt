@@ -5,7 +5,8 @@
 #| (require "ch3-translate-known-proc.rkt") |#
 #| (require "ch4-store-passing-explicit-refs.rkt") |#
 #| (require "ch4-store-passing-implicit-refs.rkt") |#
-(require "ch4-implicit-mutable-ref.rkt")
+#| (require "ch4-implicit-mutable-ref.rkt") |#
+(require "ch4-implicit-mutable-ref-v2.rkt")
 
 (define makemult-test
   "let makemult = proc (maker)
@@ -138,3 +139,8 @@
                         else (- (times4 (- x 1)) -4);
           (times4 3)
         end")
+(define implicit-refs-test5
+  "let x = 11
+    in let p = proc (y) (- y x)
+        in (- setdynamic x = 17 during (p 22)
+            (p 13))")
