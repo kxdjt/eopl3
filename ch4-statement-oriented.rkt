@@ -74,6 +74,22 @@
     (statement ( "do" statement "while" expression) do-while-stmt)
     ;;Statement ::= var {identifier}*(,) ; statement
     (statement ( "var" (separated-list identifier ",") ";" statement) block-stmt)
+    ;;Statement ::= var {identifier = expression}*(,) ; statement
+    (statement ( "var*" (separated-list identifier "=" expression ",") ";" statement) block*-stmt)
+    #| ;;Statement ::= var-rec {identifier = expression ,}* {identifier = ({identifier}*(,)) expression} ; statement |#
+    #| (statement ( "var-rec" (separated-list identifier "=" expression ",") "|" |#
+    #|                        (separated-list identifier "(" (separated-list identifier ",") ")" "=" expression ",") |#
+    #|                        ";" |#
+    #|                        statement) block-rec-stmt) |#
+    ;;Statement ::= vars {identifier = initializtion}*(,) ; statement
+    (statement ( "pvar" (separated-list identifier "=" initializtion ",") ";" statement) block-proc-stmt)
+    ;;Statement ::= identifier ( {experssion}* )
+    (statement ( "[" identifier (arbno expression) "]" ) call-stmt)
+    ;;Statement ::= read identitifer
+    (statement ( "read" identifier) read-stmt)
+    ;;-----------Initializtion Interface--------------
+    (initializtion ( "proc" "(" (separated-list identifier ",") ")" expression) proc-init)
+    (initializtion ( "subr" "(" (separated-list identifier ",") ")" statement) subr-init)
     ))
 
 (sllgen:make-define-datatypes scanner-spec-let grammar-let)
@@ -227,6 +243,13 @@
 (define apply-procedure
   (lambda (proc vals store env)
     (proc vals store env)))
+
+;; Define subroutine data type by schema procedure
+(define subroutine
+  (lambda (vars body env)
+    (lambda (vals store . _)
+      (result-of body (extend-senv* vars vals (cons env store))))))
+
 
 ;; Define Store -- implement by schema list
 (define-datatype store store?
@@ -720,8 +743,16 @@
                   (while-handler exp1 stmt1 senv))
       (do-while-stmt (stmt1 exp1)
                      (do-while-handler stmt1 exp1 senv))
-      (block-stmt (idents stmt)
-                  (block-handler idents stmt senv))
+      (block-stmt (ident stmt)
+                  (block-handler ident stmt senv))
+      (block*-stmt (idents exps stmt)
+                   (block-handler* idents exps stmt senv))
+      (block-proc-stmt (idents inits stmt)
+                       (block-proc-handler idents inits stmt senv))
+      (read-stmt (ident)
+                 (read-handler ident senv))
+      (call-stmt (ident exps)
+                 (call-handler ident exps senv))
       )))
 
 (define assign-handler
@@ -797,3 +828,109 @@
                 idents
                 '()
                 senv))))
+
+(define block-handler*
+  (lambda (idents exps stmt senv)
+    (if (null? idents)
+        (result-of stmt senv)
+        (block-handler*
+         (cdr idents)
+         (cdr exps)
+         stmt
+         (let* ((aw (value-of (car exps) senv)))
+           (extend-senv
+            (car idents)
+            (answer->eval aw)
+            (cons (car senv)
+                  (answer->store aw))))))))
+
+(define read-handler
+  (lambda (ident senv)
+    (let* ((env (car senv))
+           (store (cdr senv))
+           (ref (cases envval (apply-env env ident)
+                  (an-env-val (_ ref) ref))))
+      (store->setref store
+                     ref
+                     (num-val (read))))))
+
+(define block-proc-handler
+  (lambda (idents inits stmt senv)
+    (define make-env
+      (lambda (vars s-ref env)
+        (if (null? vars)
+            env
+            (make-env (cdr vars) (+ s-ref 1)
+                      (extend-env-mutable
+                       (car vars)
+                       s-ref
+                       env)))))
+    (define make-store
+      (lambda (inits s-ref env store)
+        (if (null? inits)
+            store
+            (make-store (cdr inits) (+ s-ref 1) env
+                        (extend-store s-ref
+                                      (cases initializtion (car inits)
+                                        (proc-init (idents exp1)
+                                                   (proc-val
+                                                    (procedure idents
+                                                               exp1
+                                                               env)))
+                                        (subr-init (idents stmt1)
+                                                   (proc-val
+                                                    (subroutine idents
+                                                                stmt1
+                                                                env))))
+                                      store)))))
+    (let* ((store (cdr senv))
+           (ref (store->nextref store))
+           (env (make-env idents ref (car senv))))
+      (result-of stmt
+                 (cons env
+                       (make-store inits ref
+                                   env
+                                   store))))))
+
+
+#| (define block-rec-handler |#
+#|   (lambda (idents1 exps1 idents2 list-of-vars exps2 stmt senv) |#
+#|     (define extend-vars-senv |#
+#|       (lambda (vars exps senv) |#
+#|         (if (null? vars) |#
+#|             senv |#
+#|             (extend-vars-senv (cdr vars) (cdr exps) |#
+#|                               (let ((aw (value-of (car exps) senv))) |#
+#|                                 (extend-senv |#
+#|                                  (car vars) |#
+#|                                  (answer->eval aw) |#
+#|                                  (cons (car senv) |#
+#|                                        (answer->store aw)))))))) |#
+#|     (let ((new-senv (extend-senv-rec*-immutable |#
+#|                      idents2 list-of-vars exps2 |#
+#|                      (extend-vars-senv |#
+#|                       idents1 exps1 senv)))) |#
+#|       (result-of stmt new-senv)))) |#
+
+(define call-handler
+  (lambda (ident exps senv)
+    (let* ((rator (apply-senv senv ident))
+           (ostore (cdr senv))
+           (env (car senv))
+           (res (foldl (lambda(exp res)
+                         (let* ((vals (car res))
+                                (last-store (cdr res))
+                                (aw (value-of exp (cons env last-store))))
+                           (cons
+                            (cons (answer->eval aw) vals)
+                            (answer->store aw))))
+                       (cons '() ostore)
+                       exps))
+           (rands (car res))
+           (store (cdr res)))
+      (cases expval rator
+        (proc-val (proc)
+                  (apply-procedure proc rands store env))
+        (else
+         (eopl:error 'call-stmt "can not apply on expval ~s" rator))))))
+
