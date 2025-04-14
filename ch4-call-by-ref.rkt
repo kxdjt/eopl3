@@ -25,6 +25,9 @@
     (none-op ((or "emptylist")) string)
     (let-op ((or "let" "let*" "letmutable" "letmutable*")) string)
     (proc-op ((or "proc" "traceproc" "dyproc")) string)
+    (customdt-op ((or "newpair" "left" "right" "setleft" "setright"
+                      "newarray" "arrayref" "arrayset" "arraylength"
+                      )) string)
     ))
 (define grammar-let
   '((program (expression) a-program)
@@ -55,6 +58,7 @@
     (inner-operator (unary-op) unary-op)
     (proc-arg (identifier) value-parg)
     (proc-arg ( "&" identifier) ref-parg)
+    (expression (customdt-op) customdtop-exp)
     ;;-----------Store Interface------------------
     ;;Expression ::= set identifier = expression
     (expression ("set" identifier "=" expression) set-exp)
@@ -119,6 +123,13 @@
    (proc proc?))
   (innerop-val
    (innerop inner-operator?))
+  (mutpair-val
+   (ref number?))
+  (array-val
+   (ref number?)
+   (num number?))
+  (customdtop-val
+   (customdtop string?))
   )
 
 (define bool-val
@@ -162,6 +173,21 @@
     (cases expval val
       (list-val (elist) elist)
       (else expval-extractor-error 'list val))))
+(define expval->mutpair
+  (lambda (val)
+    (cases expval val
+      (mutpair-val (ref) ref)
+      (else expval-extractor-error 'mutpair val))))
+(define expval->array-ref
+  (lambda (val)
+    (cases expval val
+      (array-val (ref num) ref)
+      (else expval-extractor-error 'array val))))
+(define expval->array-num
+  (lambda (val)
+    (cases expval val
+      (array-val (ref num) num)
+      (else expval-extractor-error 'array val))))
 
 ;; Define list expval
 (define-datatype explist explist?
@@ -218,43 +244,66 @@
   (lambda (proc exps store env)
     (proc exps store env)))
 
+;; is-ref*exp*store*exp-env -> ref*newstore
+(define value-of-operand
+  (lambda (is-ref act-exp store exp-env)
+    (define make-new-ref
+      (lambda (exp)
+        (let ((ref (store->nextref store))
+              (aw (value-of exp (cons exp-env store))))
+          (cons ref
+                (extend-store ref
+                              (answer->eval aw)
+                              (answer->store aw))))))
+    (if is-ref
+        (cases expression act-exp
+          (var-exp (ident)
+                   (cons (cases envval (apply-env exp-env ident)
+                           (an-env-val (_ ref) ref))
+                         store))
+          (call-exp (exp1 exps2)
+                    (let* ((aw (value-of exp1 (cons exp-env store))))
+                      (cases expval (answer->eval aw)
+                        (customdtop-val (op)
+                                        (if (equal? op "arrayref")
+                                            (let* ((res (value-of-exps exps2
+                                                                       (answer->store aw)
+                                                                       exp-env))
+                                                   (rands (car res))
+                                                   (a (car rands))
+                                                   (idx (expval->num (cadr rands))))
+                                              (cons (+ idx
+                                                       (expval->array-ref a))
+                                                    (cdr res)))
+                                            (make-new-ref act-exp)))
+                        (else
+                         (make-new-ref act-exp)))))
+          (else
+           (make-new-ref act-exp)))
+        (make-new-ref act-exp))))
+
 (define extend-proc-senv
-  (lambda (vars exps store exp-env proc-env)
-    (foldl (lambda (var exp res)
-             (let* ((new-env (car res))
-                    (last-store (cdr res))
-                    (tmp (cases proc-arg var
+  (lambda (form-paras act-exps store exp-env proc-env)
+    (if (null? form-paras)
+        (cons proc-env store)
+        (let* ((arg-info (cases proc-arg (car form-paras)
                            (value-parg (ident)
-                                       (cons #f ident))
+                                       (cons ident #f))
                            (ref-parg (ident)
-                                     (cons #t ident))))
-                    (is-ref (car tmp))
-                    (ident (cdr tmp))
-                    (tmp2 (cases expression exp
-                            (var-exp (e-ident)
-                                     (cons #t e-ident))
-                            (else
-                             (cons #f #f))))
-                    (is-var-exp (car tmp2))
-                    (e-ident (cdr tmp2)))
-               (if (and is-ref is-var-exp)
-                   (cons
-                    (extend-env-mutable
-                     ident
-                     (cases envval (apply-env exp-env e-ident)
-                       (an-env-val (_ ref) ref))
-                     new-env)
-                    last-store)
-                   (let ((aw (value-of exp (cons exp-env last-store))))
-                     (extend-senv
-                      ident
-                      (answer->eval aw)
-                      (cons new-env
-                            (answer->store aw)))))))
-           (cons proc-env store)
-           vars
-           exps
-           )))
+                                     (cons ident #t))))
+               (res (value-of-operand (cdr arg-info)
+                                      (car act-exps)
+                                      store
+                                      exp-env))
+               (new-proc-env (extend-env-mutable (car arg-info)
+                                                 (car res)
+                                                 proc-env))
+               (new-store (cdr res)))
+          (extend-proc-senv (cdr form-paras)
+                            (cdr act-exps)
+                            new-store
+                            exp-env
+                            new-proc-env)))))
 
 ;; Define Store -- implement by schema list
 (define-datatype store store?
@@ -410,6 +459,10 @@
                      (an-answer
                       (innerop-val inner-op)
                       store))
+        (customdtop-exp (cusop)
+                        (an-answer
+                         (customdtop-val cusop)
+                         store))
         (if-exp (exp1 exp2 exp3)
                 (let ((aw1 (value-of exp1 senv)))
                   (if (expval->bool (answer->eval aw1))
@@ -561,17 +614,20 @@
    (cons "dyproc" (make-procedure-val dynamicproc))
    ))
 
+(define value-of-exps
+  (lambda (exps store env)
+    (if (null? exps)
+        (cons '() store)
+        (let* ((aw (value-of (car exps) (cons env store)))
+               (res (value-of-exps (cdr exps)
+                                   (answer->store aw) env)))
+          (cons
+           (cons (answer->eval aw) (car res))
+           (cdr res))))))
+
 (define apply-innerop
   (lambda (innerop exps1 store env)
-    (let* ((res (foldr (lambda(exp res)
-                         (let* ((vals (car res))
-                                (last-store (cdr res))
-                                (aw (value-of exp (cons env last-store))))
-                           (cons
-                            (cons (answer->eval aw) vals)
-                            (answer->store aw))))
-                       (cons '() store)
-                       exps1))
+    (let* ((res (value-of-exps exps1 store env))
            (rands (car res))
            (store (cdr res)))
       (an-answer
@@ -584,6 +640,13 @@
                    ((unary-operator op) (car rands))))
        store))))
 
+(define apply-customdtop
+  (lambda (op exps store env)
+    (let* ((res (value-of-exps exps store env))
+           (rands (car res))
+           (store (cdr res)))
+      ((customdt-operator op) rands store env))))
+
 (define call-operator
   (lambda (exp1 exps2 store env)
     (let* ((aw (value-of exp1 (cons env store)))
@@ -594,6 +657,8 @@
                   (apply-procedure proc exps2 store env))
         (innerop-val (innerop)
                      (apply-innerop innerop exps2 store env))
+        (customdtop-val (op)
+                        (apply-customdtop op exps2 store env))
         (else
          (eopl:error 'call-exp "can not apply on expval ~s" rator))))))
 
@@ -659,6 +724,155 @@
 (define none-operator
   (make-fun-table
    (cons "emptylist" emptylist-op)
+   ))
+
+(define storedata->new
+  (lambda (def-val init-vals num store make-fun)
+    (define make-store
+      (lambda (init-vals num ref store)
+        (if (zero? num)
+            store
+            (let* ((is-null (null? init-vals))
+                   (val (if is-null def-val
+                            (car init-vals)))
+                   (next-vals (if is-null init-vals
+                                  (cdr init-vals))))
+              (make-store next-vals
+                          (- num 1)
+                          (+ ref 1)
+                          (extend-store ref
+                                        val
+                                        store))))))
+    (let ((ref (store->nextref store)))
+      (an-answer
+       (make-fun ref)
+       (make-store init-vals
+                   num
+                   ref
+                   store)))))
+
+(define storedata->safe-handler
+  (lambda (fun sd idx max-num . vars)
+    (if (>= idx max-num)
+        (eopl:error 'storedata-check "invalid idx for storedata ~s:~s" sd idx)
+        (apply fun sd idx vars))))
+
+(define storedata->getbyidx
+  (lambda (sd idx store get-ref-fun)
+    (let ((ref (get-ref-fun sd)))
+      (an-answer
+       (store->findref store (+ ref idx))
+       store))))
+
+(define storedata->safe-getbyidx
+  (lambda (sd idx max-num store get-ref-fun)
+    (storedata->safe-handler
+     storedata->getbyidx sd idx max-num
+     store
+     get-ref-fun)))
+
+(define storedata->setbyidx
+  (lambda (sd idx val store get-ref-fun)
+    (let ((ref (get-ref-fun sd)))
+      (an-answer
+       sd
+       (store->setref
+        store
+        (+ ref idx)
+        val)))))
+
+(define storedata->safe-setbyidx
+  (lambda (sd idx max-num val store get-ref-fun)
+    (storedata->safe-handler
+     storedata->setbyidx sd idx max-num
+     val
+     store
+     get-ref-fun)))
+
+(define array->new
+  (lambda (rands store env)
+    (debug-info "array->new" "rands:~s store:~s\n" rands store)
+    (let ((def-val (cadr rands))
+          (num (expval->num (car rands)))
+          (init-vals '()))
+      (storedata->new def-val init-vals num store
+                      (lambda (ref)
+                        (array-val ref num))))))
+
+(define array->ref
+  (lambda (rands store env)
+    (let* ((a (car rands))
+           (idx (expval->num (cadr rands)))
+           (num (expval->array-num a)))
+      (storedata->safe-getbyidx a
+                                idx
+                                num
+                                store
+                                expval->array-ref))))
+
+(define array->set
+  (lambda (rands store env)
+    (let* ((a (car rands))
+           (idx (expval->num (cadr rands)))
+           (num (expval->array-num a)))
+      (storedata->safe-setbyidx a
+                                idx
+                                num
+                                (caddr rands)
+                                store
+                                expval->array-ref))))
+
+(define array->len
+  (lambda (rands store env)
+    (an-answer
+     (num-val (expval->array-num (car rands)))
+     store)))
+
+(define pairs->new
+  (lambda (rands store env)
+    (storedata->new (num-val 0) rands 2 store mutpair-val)))
+
+(define pairs->left
+  (lambda (rands store env)
+    (storedata->getbyidx (car rands)
+                         0
+                         store
+                         expval->mutpair)))
+
+(define pairs->right
+  (lambda (rands store env)
+    (storedata->getbyidx (car rands)
+                         1
+                         store
+                         expval->mutpair)))
+
+(define pairs->setleft
+  (lambda (rands store env)
+    (storedata->setbyidx (car rands)
+                         0
+                         (cadr rands)
+                         store
+                         expval->mutpair)))
+
+(define pairs->setright
+  (lambda (rands store env)
+    (storedata->setbyidx (car rands)
+                         1
+                         (cadr rands)
+                         store
+                         expval->mutpair)))
+
+(define customdt-operator
+  (make-fun-table
+   (cons "newpair" pairs->new)
+   (cons "left" pairs->left)
+   (cons "right" pairs->right)
+   (cons "setleft" pairs->setleft)
+   (cons "setright" pairs->setright)
+   (cons "newarray" array->new)
+   (cons "arrayref" array->ref)
+   (cons "arrayset" array->set)
+   (cons "arraylength" array->len)
    ))
 
 (define begin-operator

@@ -1,6 +1,6 @@
 #lang racket
 
-(require "ch4-implicit-mutable-ref-v2.rkt")
+(require "ch4-implicit-mutable-pair.rkt")
 
 (define implicit-refs-test
   " let x = 0
