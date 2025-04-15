@@ -24,7 +24,7 @@
     (unary-op ((or "minus" "zero?" "car" "cdr" "null?")) string)
     (none-op ((or "emptylist")) string)
     (let-op ((or "let" "let*" "letmutable" "letmutable*")) string)
-    (proc-op ((or "proc" "traceproc" "dyproc")) string)
+    (proc-op ((or "proc" "traceproc" "dyproc" "cbrrproc")) string)
     (customdt-op ((or "newpair" "left" "right" "setleft" "setright"
                       "newarray" "arrayref" "arrayset" "arraylength"
                       )) string)
@@ -112,6 +112,11 @@
     (an-env-val
      false
      eval)))
+
+(define apply-env->ref
+  (lambda (env ident)
+    (cases envval (apply-env env ident)
+      (an-env-val (_ ref) ref))))
 
 ;; Define Expressed valus
 (define-datatype expval expval?
@@ -225,7 +230,6 @@
   (lambda (vars body env)
     (lambda (vals store exp-env)
       (value-of body (extend-proc-senv vars vals store exp-env env)))))
-#| (extend-senv* vars vals (cons env store)))))) |#
 (define traceproc
   (lambda (vars body env)
     (lambda (vals store exp-env)
@@ -238,11 +242,51 @@
   (lambda (vars body proc-env)
     (lambda (vals store env)
       (value-of body (extend-proc-senv vars vals store env env)))))
-#| (extend-senv* vars vals (cons env store)))))) |#
+;; call-by-ref-result
+(define cbrrproc
+  (lambda (vars body env)
+    (lambda (vals store exp-env)
+      (let* ((new-proc-senv (extend-proc-senv-by-val vars vals store exp-env env))
+             (aw (value-of body new-proc-senv))
+             (new-store (copy-res-to-refparas vars
+                                              vals
+                                              (answer->store aw)
+                                              exp-env
+                                              (car new-proc-senv))))
+        (an-answer
+         (answer->eval aw)
+         new-store)))))
+
 ;; Proc * Val -> ExpVal
 (define apply-procedure
   (lambda (proc exps store env)
     (proc exps store env)))
+
+;; exp*store*env -> flag*ref*store
+(define get-ref-from-exp
+  (lambda (exp store env)
+    (cases expression exp
+      (var-exp (ident)
+               (cons #t
+                     (cons (apply-env->ref env ident)
+                           store)))
+      (call-exp (exp1 exps2)
+                (let* ((aw (value-of exp1 (cons env store))))
+                  (cases expval (answer->eval aw)
+                    (customdtop-val (op)
+                                    (if (equal? op "arrayref")
+                                        (let* ((res (value-of-exps exps2
+                                                                   (answer->store aw)
+                                                                   env))
+                                               (rands (car res))
+                                               (a (car rands))
+                                               (idx (expval->num (cadr rands))))
+                                          (cons #t
+                                                (cons (+ idx (expval->array-ref a))
+                                                      (cdr res))))
+                                        (cons #f '())))
+                    (else (cons #f '())))))
+      (else (cons #f '())))))
 
 ;; is-ref*exp*store*exp-env -> ref*newstore
 (define value-of-operand
@@ -255,32 +299,30 @@
                 (extend-store ref
                               (answer->eval aw)
                               (answer->store aw))))))
-    (if is-ref
-        (cases expression act-exp
-          (var-exp (ident)
-                   (cons (cases envval (apply-env exp-env ident)
-                           (an-env-val (_ ref) ref))
-                         store))
-          (call-exp (exp1 exps2)
-                    (let* ((aw (value-of exp1 (cons exp-env store))))
-                      (cases expval (answer->eval aw)
-                        (customdtop-val (op)
-                                        (if (equal? op "arrayref")
-                                            (let* ((res (value-of-exps exps2
-                                                                       (answer->store aw)
-                                                                       exp-env))
-                                                   (rands (car res))
-                                                   (a (car rands))
-                                                   (idx (expval->num (cadr rands))))
-                                              (cons (+ idx
-                                                       (expval->array-ref a))
-                                                    (cdr res)))
-                                            (make-new-ref act-exp)))
-                        (else
-                         (make-new-ref act-exp)))))
-          (else
-           (make-new-ref act-exp)))
-        (make-new-ref act-exp))))
+    (let ((res (if is-ref
+                   (get-ref-from-exp act-exp store exp-env)
+                   (cons #f '()))))
+      (if (car res)
+          (cdr res)
+          (make-new-ref act-exp)))))
+
+(define extend-proc-senv-by-val
+  (lambda (form-paras act-exps store exp-env proc-env)
+    (if (null? form-paras)
+        (cons proc-env store)
+        (let* ((aw (value-of (car act-exps) (cons exp-env store)))
+               (ident (cases proc-arg (car form-paras)
+                        (value-parg (ident) ident)
+                        (ref-parg (ident) ident)))
+               (new-senv (extend-senv ident
+                                      (answer->eval aw)
+                                      (cons proc-env
+                                            (answer->store aw)))))
+          (extend-proc-senv-by-val (cdr form-paras)
+                                   (cdr act-exps)
+                                   (cdr new-senv)
+                                   exp-env
+                                   (car new-senv))))))
 
 (define extend-proc-senv
   (lambda (form-paras act-exps store exp-env proc-env)
@@ -304,6 +346,30 @@
                             new-store
                             exp-env
                             new-proc-env)))))
+
+;; copy back result
+;; form-paras*act-paras*store*exp-env*proc-env -> new-store
+(define copy-res-to-refparas
+  (lambda (form-paras act-exps store exp-env proc-env)
+    (if (null? form-paras)
+        store
+        (copy-res-to-refparas
+         (cdr form-paras)
+         (cdr act-exps)
+         (cases proc-arg (car form-paras)
+           (value-parg (_)
+                       store)
+           (ref-parg (ident)
+                     (let ((val (apply-senv (cons proc-env store) ident))
+                           (ref-info (get-ref-from-exp (car act-exps) store exp-env)))
+                       (if (car ref-info)
+                           (store->setref
+                            store
+                            (cadr ref-info)
+                            val)
+                           store))))
+         exp-env
+         proc-env))))
 
 ;; Define Store -- implement by schema list
 (define-datatype store store?
@@ -612,6 +678,7 @@
    (cons "proc" (make-procedure-val procedure))
    (cons "traceproc" (make-procedure-val traceproc))
    (cons "dyproc" (make-procedure-val dynamicproc))
+   (cons "cbrrproc" (make-procedure-val cbrrproc))
    ))
 
 (define value-of-exps
@@ -902,8 +969,7 @@
 (define setdy-operator
   (lambda (ident exp1 exp2 senv)
     (let* ((env (car senv))
-           (ref (cases envval (apply-env env ident)
-                  (an-env-val (mutable ref) ref)))
+           (ref (apply-env->ref env ident))
            (old-val (store->findref (cdr senv) ref))
            (aw (value-of exp1 senv))
            (res-aw (value-of exp2

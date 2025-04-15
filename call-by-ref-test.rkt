@@ -73,3 +73,45 @@
                (arrayset a 2 2);
                (swap (arrayref a (arrayref a 1)) (arrayref a 2));
                (- (arrayref a 0) (arrayref a 2)) end")
+(define call-by-ref-result-test
+  " letmutable a=3 b=4
+      in let p = cbrrproc (&x, &y)
+                  let z = x
+                    in begin
+                      set x = y;
+                      set y = z
+                      end
+          in begin (p a b); (- a b) end")
+(define call-by-ref-result-test2
+  " letmutable a=3 b=4
+      in let p = cbrrproc (&x, y)
+                  let z = x
+                    in begin
+                      set x = y;
+                      set y = z
+                      end
+          in begin (p a b); (- a b) end")
+(define call-by-ref-result-test3
+  "let a = (newarray 3 0)
+       swap = cbrrproc(&x,&y)
+              let tmp = x
+               in begin
+                set x = y;
+                set y = tmp
+                end
+      in begin (arrayset a 0 1);
+               (arrayset a 2 2);
+               (swap (arrayref a (arrayref a 1)) (arrayref a 2));
+               (- (arrayref a 0) (arrayref a 2)) end")
+(define call-by-ref-result-test4
+  "let a = (newarray 3 0)
+       swap = cbrrproc(&x,y)
+              let tmp = x
+               in begin
+                set x = y;
+                set y = tmp
+                end
+      in begin (arrayset a 0 1);
+               (arrayset a 2 2);
+               (swap (arrayref a (arrayref a 1)) (arrayref a 2));
+               (- (arrayref a 0) (arrayref a 2)) end")
