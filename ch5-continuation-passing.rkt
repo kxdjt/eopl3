@@ -291,7 +291,7 @@
             (value-of/k body new-env cont)
             (value-of/k (car exps)
                         new-env
-                        (let-cont (cdr vars) (cdr exps) body cont new-env)))))))
+                        (let*-cont (cdr vars) (cdr exps) body cont new-env)))))))
 (define let-cont
   (lambda (vars exps body cont ori-env env)
     (lambda (eval)
@@ -300,7 +300,7 @@
             (value-of/k body new-env cont)
             (value-of/k (car exps)
                         ori-env
-                        (let*-cont (cdr vars) (cdr exps) body cont ori-env new-env)))))))
+                        (let-cont (cdr vars) (cdr exps) body cont ori-env new-env)))))))
 (define cond-cont
   (lambda (exps1 exps2 env cont)
     (lambda (eval)
