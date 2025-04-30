@@ -1,6 +1,6 @@
 #lang racket
 
-(provide empty-env extend-env extend-env* apply-env has-binding?)
+(provide empty-env extend-env extend-env* apply-env has-binding? environment?)
 (require "ch2-datatype-utils.rkt")
 
 (define empty-env
@@ -48,6 +48,10 @@
 (define has-binding?
   (lambda (env search-var)
     ((cdr env) search-var)))
+(define environment?
+  (lambda (e)
+    (and (procedure? (car e))
+         (procedure? (cdr e)))))
 
 
 

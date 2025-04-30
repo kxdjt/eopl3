@@ -7,11 +7,6 @@
 
 (provide run)
 
-(define environment?
-  (lambda (e)
-    (and (procedure? (car e))
-         (procedure? (cdr e)))))
-
 (require (except-in eopl list-of))
 #| (require "ch2-ribcage-env.rkt") |#
 (require "ch3-enironment.rkt")
