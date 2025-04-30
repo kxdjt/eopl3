@@ -22,7 +22,7 @@
 (define scanner-spec-let
   '((white-sp (whitespace) skip)
     (number ((or digit (concat "-" digit)) (arbno digit)) number)
-    (identifier (letter (arbno (or letter digit "?"))) symbol)
+    (identifier (letter (arbno (or letter digit "?" "-"))) symbol)
     (binary-op ((or "+" "-" "*" "/" "equal?" "greater?" "less?" "cons")) string)
     (unary-op ((or "minus" "zero?" "car" "cdr" "null?")) string)
     (none-op ((or "emptylist")) string)
@@ -49,6 +49,9 @@
     ;;Expression ::= (expression {expression}* )
     ;;               call-exp (rator rands)
     (expression ( "(" expression (arbno expression) ")" ) call-exp)
+    ;;Expression ::= begin Expression {; Expression}* end
+    ;;               begin-exp (exp1 exps2)
+    (expression ( "begin" expression (arbno ";" expression) "end") begin-exp)
     (expression (inner-operator) innerop-exp)
     (inner-operator (none-op) none-op)
     (inner-operator (binary-op) binary-op)
@@ -153,8 +156,8 @@
 ;; Define procedure data type by scheme procedure
 (define procedure
   (lambda (vars body env)
-    (let ((proc-env (extract-freevar-env vars body env (empty-env))))
-      (lambda (vals env cont)
+    (lambda (vals _ cont)
+      (let ((proc-env (extract-freevar-env vars body env (empty-env))))
         (value-of/k body
                     (extend-env* vars vals proc-env)
                     cont)))))
@@ -265,7 +268,12 @@
       (call-exp (exp1 rands)
                 (value-of/k exp1
                             env
-                            (call-cont rands env cont))))))
+                            (call-cont rands env cont)))
+      (begin-exp (exp1 exps2)
+                 (value-of/k exp1
+                             env
+                             (begin-cont exps2 env cont)))
+      )))
 
 ;; procedure representation of continuation
 ;; Cont * Eval -> FinalAnswer
@@ -359,6 +367,14 @@
             (value-of/k (car rands)
                         env
                         (proc-cont proc (cdr rands) env cont new-vals)))))))
+(define begin-cont
+  (lambda (exps2 env cont)
+    (lambda (eval)
+      (if (null? exps2)
+          (apply-cont cont eval)
+          (value-of/k (car exps2)
+                      env
+                      (begin-cont (cdr exps2) env cont))))))
 
 (define make-let-cont-by-op
   (lambda (op vars exps body cont env)
