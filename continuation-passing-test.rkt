@@ -58,3 +58,5 @@
      in let fact-iter=proc(n)
                       (fact-iter-acc n 1)
          in (fact-iter 4)")
+(define list-test
+  "(list 1 (list 2) 3 (list))")

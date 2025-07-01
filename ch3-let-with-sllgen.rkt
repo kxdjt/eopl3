@@ -26,6 +26,7 @@
     (binary-op ((or "+" "-" "*" "/" "equal?" "greater?" "less?" "cons")) string)
     (unary-op ((or "minus" "zero?" "car" "cdr" "null?")) string)
     (none-op ((or "emptylist")) string)
+    (any-op ((or "list")) string)
     (let-op ((or "let" "let*")) string)
     (proc-op ((or "proc" "traceproc" "dyproc")) string)
     ))
@@ -56,6 +57,7 @@
     (inner-operator (none-op) none-op)
     (inner-operator (binary-op) binary-op)
     (inner-operator (unary-op) unary-op)
+    (inner-operator (any-op) any-op)
     ))
 
 (sllgen:make-define-datatypes scanner-spec-let grammar-let)
@@ -271,7 +273,10 @@
                                    (binary-op (op)
                                               ((binary-operator op) (car rands) (cadr rands) env))
                                    (unary-op (op)
-                                             ((unary-operator op) (car rands) env))))
+                                             ((unary-operator op) (car rands) env))
+                                   (any-op (op)
+                                           ((any-operator op) rands env))
+                                   ))
                     (else
                      (eopl:error 'call-exp "can not apply on expval ~s" rator))
                     )))
@@ -318,6 +323,13 @@
   (lambda (env)
     (list-val
      (empty-list))))
+(define list-op
+  (lambda (exps env)
+    (if (null? exps)
+        (list-val (empty-list))
+        (list-val
+         (cons-val (value-of (car exps) env)
+                   (expval->list (list-op (cdr exps) env)))))))
 (define cond-operator
   (lambda (exps1 exps2 env)
     (if (null? exps1)
@@ -429,6 +441,10 @@
 (define none-operator
   (make-fun-table
    (cons "emptylist" emptylist-op)
+   ))
+(define any-operator
+  (make-fun-table
+   (cons "list" list-op)
    ))
 (define let-operator
   (make-fun-table

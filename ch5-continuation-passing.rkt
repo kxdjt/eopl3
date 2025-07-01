@@ -26,6 +26,7 @@
     (binary-op ((or "+" "-" "*" "/" "equal?" "greater?" "less?" "cons")) string)
     (unary-op ((or "minus" "zero?" "car" "cdr" "null?")) string)
     (none-op ((or "emptylist")) string)
+    (any-op ((or "list")) string)
     (let-op ((or "let" "let*")) string)
     (proc-op ((or "proc" "traceproc" "dyproc")) string)
     ))
@@ -56,6 +57,7 @@
     (inner-operator (none-op) none-op)
     (inner-operator (binary-op) binary-op)
     (inner-operator (unary-op) unary-op)
+    (inner-operator (any-op) any-op)
     ))
 
 (sllgen:make-define-datatypes scanner-spec-let grammar-let)
@@ -332,7 +334,14 @@
                        (unary-op (op)
                                  (value-of/k (car rands)
                                              env
-                                             (unary-op-cont op cont)))))
+                                             (unary-op-cont op cont)))
+                       (any-op (op)
+                               (if (null? rands)
+                                   (apply-cont cont ((any-operator op) '()))
+                                   (value-of/k (car rands)
+                                               env
+                                               (any-op-cont op (cdr rands) env cont '()))))
+                       ))
         (proc-val (proc)
                   (if (null? rands)
                       (apply-procedure proc '() env cont)
@@ -358,6 +367,15 @@
     (lambda (eval)
       (apply-cont cont
                   ((unary-operator op) eval)))))
+(define any-op-cont
+  (lambda (op rands env cont vals)
+    (lambda (eval)
+      (let ((new-vals (append vals (list eval))))
+        (if (null? rands)
+            (apply-cont cont ((any-operator op) vals))
+            (value-of/k (car rands)
+                        env
+                        (any-op-cont op (cdr rands) env cont new-vals)))))))
 (define proc-cont
   (lambda (proc rands env cont vals)
     (lambda (eval)
@@ -424,6 +442,13 @@
   (lambda ()
     (list-val
      (empty-list))))
+(define list-op
+  (lambda (evals)
+    (if (null? evals)
+        (list-val (empty-list))
+        (list-val
+         (cons-val (car evals)
+                   (expval->list (list-op (cdr evals))))))))
 (define extract-freevar-env-from-explist
   (lambda (bindvars exps env nenv)
     (foldl (lambda(exp nenv)
@@ -496,6 +521,10 @@
 (define none-operator
   (make-fun-table
    (cons "emptylist" emptylist-op)
+   ))
+(define any-operator
+  (make-fun-table
+   (cons "list" list-op)
    ))
 (define proc-operator
   (make-fun-table

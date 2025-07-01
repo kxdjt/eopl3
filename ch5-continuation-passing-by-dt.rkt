@@ -22,7 +22,7 @@
 (define scanner-spec-let
   '((white-sp (whitespace) skip)
     (number ((or digit (concat "-" digit)) (arbno digit)) number)
-    (identifier (letter (arbno (or letter digit "?"))) symbol)
+    (identifier (letter (arbno (or letter digit "?" "-"))) symbol)
     (binary-op ((or "+" "-" "*" "/" "equal?" "greater?" "less?" "cons")) string)
     (unary-op ((or "minus" "zero?" "car" "cdr" "null?")) string)
     (none-op ((or "emptylist")) string)
@@ -153,11 +153,10 @@
 ;; Define procedure data type by scheme procedure
 (define procedure
   (lambda (vars body env)
-    (let ((proc-env (extract-freevar-env vars body env (empty-env))))
-      (lambda (vals env cont)
-        (value-of/k body
-                    (extend-env* vars vals proc-env)
-                    cont)))))
+    (lambda (vals _ cont)
+      (value-of/k body
+                  (extend-env* vars vals env)
+                  cont))))
 #| (define traceproc |#
 #|   (lambda (vars body env) |#
 #|     (let ((env (extract-freevar-env vars body env (empty-env)))) |#
