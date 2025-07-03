@@ -60,3 +60,13 @@
          in (fact-iter 4)")
 (define list-test
   "(list 1 (list 2) 3 (list))")
+(define implicit-refs-test
+  "let g = let count = 0
+            in proc (dummy)
+                begin
+                set count =(- count -1);
+                count
+                end
+    in let a = (g 11)
+        in let b = (g 11)
+            in (- a b)")

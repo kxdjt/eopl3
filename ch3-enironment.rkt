@@ -13,6 +13,7 @@
        #f))))
 (define extend-env
   (lambda (var val env)
+    (debug-info "extend-env" "var:~s val:~s\n" var val)
     (cons
      (lambda (search-var)
        (if (equal? search-var var)
@@ -24,6 +25,7 @@
            (has-binding? env search-var))))))
 (define extend-env*
   (lambda (vars vals env)
+    (debug-info "extend-env*" "vars:~s vals:~s\n" vars vals)
     (let ((make-ob-action
            (lambda (observer ret-fun)
              (lambda (search-var)

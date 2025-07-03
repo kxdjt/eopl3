@@ -58,6 +58,9 @@
     (inner-operator (binary-op) binary-op)
     (inner-operator (unary-op) unary-op)
     (inner-operator (any-op) any-op)
+    ;;-----------Store Interface------------------
+    ;;Expression ::= set identifier = expression
+    (expression ("set" identifier "=" expression) set-exp)
     ))
 
 (sllgen:make-define-datatypes scanner-spec-let grammar-let)
@@ -67,6 +70,25 @@
 
 (define scan&parse
   (sllgen:make-string-parser scanner-spec-let grammar-let))
+
+#| Interpreter for the LET language |#
+;; run : string -> ExpVal
+(define run
+  (lambda (string)
+    (value-of-program (scan&parse string))))
+(define init-senv
+  (lambda ()
+    (extend-senv 'i (num-val 1)
+                 (extend-senv 'v (num-val 5)
+                              (extend-senv 'x (num-val 10)
+                                           (empty-senv))))))
+
+;; Program -> FinalAnswer = ExpVal
+(define value-of-program
+  (lambda (pgm)
+    (cases program pgm
+      (a-program (exp1)
+                 (value-of/k exp1 (init-senv) (end-cont))))))
 
 #| Expressed values for the LET language |#
 (define-datatype expval expval?
@@ -158,10 +180,12 @@
 ;; Define procedure data type by scheme procedure
 (define procedure
   (lambda (vars body env)
-    (lambda (vals _ cont)
-      (let ((proc-env (extract-freevar-env vars body env (empty-env))))
+    #| (proc-env (extract-freevar-env vars body env (empty-env))) |#
+    (lambda (vals senv cont)
+      (let* ((store (cdr senv))
+             (new-senv (cons env store)))
         (value-of/k body
-                    (extend-env* vars vals proc-env)
+                    (extend-senv* vars vals new-senv)
                     cont)))))
 #| (define traceproc |#
 #|   (lambda (vars body env) |#
@@ -175,231 +199,368 @@
 #|           res))))) |#
 (define dynamicproc
   (lambda (vars body . _)
-    (lambda (vals env cont)
+    (lambda (vals senv cont)
       (value-of/k body
-                  (extend-env* vars vals env)
+                  (extend-senv* vars vals senv)
                   cont))))
-;; Proc * Vals * cont -> FinalAnswer
+;; Proc * Vals * Senv * Cont -> FinalAnswer
 (define apply-procedure
-  (lambda (proc vals env cont)
-    (proc vals env cont)))
+  (lambda (proc vals senv cont)
+    (proc vals senv cont)))
 (define proc?
   (lambda (proc)
     (procedure? proc)))
 
-(define extend-env-rec*
-  (lambda (proc-names list-of-vars exps env)
-    (cons
-     (lambda (search-var)
-       (let ((res (ormap (lambda(proc-name vars exp1)
-                           (if (equal? search-var proc-name)
-                               (proc-val (procedure vars exp1
-                                                    (extend-env-rec* proc-names list-of-vars exps env)))
-                               #f))
-                         proc-names
-                         list-of-vars
-                         exps)))
-         (if (not res)
-             (apply-env env search-var)
-             res)))
-     (lambda (search-var)
-       (if (list-member? search-var proc-names)
-           #t
-           (has-binding? env search-var))))))
-(define extend-env-rec
-  (lambda (proc-name vars exp1 env)
-    (cons
-     (lambda (search-var)
-       (if (equal? search-var proc-name)
-           (proc-val (procedure vars exp1
-                                (extend-env-rec proc-name vars exp1 env)))
-           (apply-env env search-var)))
-     (lambda (search-var)
-       (if (equal? proc-name search-var)
-           #t
-           (has-binding? env search-var))))))
+(define extend-senv-rec*
+  (lambda (proc-names list-of-vars exps senv)
+    (define make-env
+      (lambda (vars s-ref env)
+        (if (null? vars)
+            env
+            (make-env (cdr vars) (+ s-ref 1)
+                      (extend-env (car vars) s-ref env)))))
+    (define make-store
+      (lambda (lvars exps s-ref env store)
+        (if (null? exps)
+            store
+            (make-store (cdr lvars)
+                        (cdr exps)
+                        (+ s-ref 1)
+                        env
+                        (extend-store s-ref
+                                      (proc-val
+                                       (procedure (car lvars)
+                                                  (car exps)
+                                                  env))
+                                      store)))))
+    (let* ((env (car senv))
+           (store (cdr senv))
+           (start-ref (store->nextref store))
+           (nenv (make-env proc-names start-ref env))
+           (nstore (make-store list-of-vars exps start-ref nenv store)))
+      (cons nenv nstore))))
 
-#| Interpreter for the LET language |#
-;; run : string -> ExpVal
-(define run
-  (lambda (string)
-    (value-of-program (scan&parse string))))
-(define init-env
+;; Define Store -- implement by schema list
+(define-datatype store store?
+  (empty-store)
+  (extend-store
+   (ref number?)
+   (val expval?)
+   (s store?)))
+(define store->nextref
+  (lambda (s)
+    (cases store s
+      (empty-store () 1)
+      (extend-store (ref eval _) (+ ref 1)))))
+(define store->findref
+  (lambda (s s-ref)
+    (cases store s
+      (extend-store (ref eval nexts)
+                    (cond
+                      ((equal? s-ref ref) eval)
+                      ((> s-ref ref)
+                       (eopl:error 'store->findref "invalid ref ~s in store ~s" s-ref s))
+                      (else
+                       (store->findref nexts s-ref))))
+      (empty-store ()
+                   (eopl:error 'store->findref "invalid ref ~s in store ~s" s-ref s)))))
+(define store->setref
+  (lambda (s s-ref eval)
+    (cases store s
+      (empty-store ()
+                   (eopl:error 'store->setref "invalid ref ~s in store ~s" s-ref s))
+      (extend-store (ref old-eval nexts)
+                    (cond
+                      ((equal? s-ref ref)
+                       (extend-store
+                        ref
+                        eval
+                        nexts))
+                      ((> s-ref ref)
+                       (eopl:error 'store->setref "invalid ref ~s in store ~s" s-ref s))
+                      (else
+                       (let ((ns (store->setref nexts s-ref eval)))
+                         (extend-store
+                          ref
+                          old-eval
+                          ns))))))))
+
+;; Define senv -- (env . store)
+(define empty-senv
   (lambda ()
-    (extend-env 'i (num-val 1)
-                (extend-env 'v (num-val 5)
-                            (extend-env 'x (num-val 10)
-                                        (empty-env))))))
-
-;; Program -> FinalAnswer = ExpVal
-(define value-of-program
-  (lambda (pgm)
-    (cases program pgm
-      (a-program (exp1)
-                 (value-of/k exp1 (init-env) (end-cont))))))
-;; Exp * Env * Cont -> FinalAnswer
-(define value-of/k
-  (lambda (exp env cont)
-    (cases expression exp
-      (const-exp (num)
-                 (apply-cont cont  (num-val num)))
-      (var-exp (var)
-               (apply-cont cont (apply-env env var)))
-      (innerop-exp (inner-op)
-                   (apply-cont cont (innerop-val inner-op)))
-      (if-exp (exp1 exp2 exp3)
-              (value-of/k exp1 env
-                          (if-cont exp2 exp3 env cont)))
-      (let-exp (op vars exps body)
-               (if (null? exps)
-                   (value-of/k body env cont)
-                   (value-of/k (car exps) env
-                               (make-let-cont-by-op
-                                op vars (cdr exps) body cont env))))
-      (letrec-exp (proc-names list-of-vars exps1 exp2)
-                  (value-of/k exp2
-                              (extend-env-rec* proc-names list-of-vars exps1 env)
-                              cont))
-      (cond-exp (exps1 exps2)
-                (value-of/k (car exps1)
-                            env
-                            (cond-cont (cdr exps1) exps2 env cont)))
-      (proc-exp (op vars body)
-                (apply-cont cont
-                            (proc-val ((proc-operator op) vars body env))))
-      (call-exp (exp1 rands)
-                (value-of/k exp1
-                            env
-                            (call-cont rands env cont)))
-      (begin-exp (exp1 exps2)
-                 (value-of/k exp1
-                             env
-                             (begin-cont exps2 env cont)))
+    (cons (empty-env) (empty-store))))
+;; var*expval*(env . store) -> (newenv . newstore)
+(define extend-senv
+  (lambda (var eval senv)
+    (let* ((env (car senv))
+           (store (cdr senv))
+           (ref (store->nextref store)))
+      (cons
+       (extend-env var ref env)
+       (extend-store ref eval store)))))
+;; vars**expval*(env . store) -> (newenv . newstore)
+(define extend-senv*
+  (lambda (vars evals senv)
+    (if (null? vars)
+        senv
+        (extend-senv* (cdr vars) (cdr evals)
+                      (extend-senv (car vars)
+                                   (car evals)
+                                   senv)))))
+;; (env . store)*var -> val
+(define apply-senv
+  (lambda (senv var)
+    (let* ((env (car senv))
+           (store (cdr senv))
+           (ref (apply-env env var)))
+      (store->findref store ref)
       )))
 
+;; Define Answer -- include expval and store
+(define-datatype answer answer?
+  (an-answer
+   (eval expval?)
+   (s store?)))
+(define answer->eval
+  (lambda (aw)
+    (cases answer aw
+      (an-answer (eval _) eval))))
+(define answer->store
+  (lambda (aw)
+    (cases answer aw
+      (an-answer (_ s) s))))
+
+;; Exp * Env * Cont -> FinalAnswer
+(define value-of/k
+  (lambda (exp senv cont)
+    (let* ((store (cdr senv))
+           (env (car senv))
+           (make-answer (lambda(eval)
+                          (an-answer eval store))))
+      (cases expression exp
+        (const-exp (num)
+                   (apply-cont cont
+                               (make-answer
+                                (num-val num))))
+        (var-exp (var)
+                 (apply-cont cont
+                             (make-answer
+                              (apply-senv senv var))))
+        (innerop-exp (inner-op)
+                     (apply-cont cont
+                                 (make-answer
+                                  (innerop-val inner-op))))
+        (if-exp (exp1 exp2 exp3)
+                (value-of/k exp1 senv
+                            (if-cont exp2 exp3 env cont)))
+        (let-exp (op vars exps body)
+                 (if (null? exps)
+                     (value-of/k body senv cont)
+                     (value-of/k (car exps) senv
+                                 (make-let-cont-by-op
+                                  op vars (cdr exps) body cont env))))
+        (letrec-exp (proc-names list-of-vars exps1 exp2)
+                    (value-of/k exp2
+                                (extend-senv-rec* proc-names list-of-vars exps1 senv)
+                                cont))
+        (cond-exp (exps1 exps2)
+                  (if (null? exps1)
+                      (eopl:error 'cond "None of the tests succeeds!")
+                      (value-of/k (car exps1)
+                                  senv
+                                  (cond-cont (cdr exps1) exps2 env cont))))
+        (proc-exp (op vars body)
+                  (apply-cont cont
+                              (make-answer
+                               (proc-val ((proc-operator op) vars body env)))))
+        (call-exp (exp1 rands)
+                  (value-of/k exp1
+                              senv
+                              (call-cont rands env cont)))
+        (begin-exp (exp1 exps2)
+                   (value-of/k exp1
+                               senv
+                               (begin-cont exps2 env cont)))
+        (set-exp (ident exp1)
+                 (value-of/k exp1
+                             senv
+                             (set-cond ident env cont)))
+        ))))
+
 ;; procedure representation of continuation
-;; Cont * Eval -> FinalAnswer
+;; Cont * Answer -> FinalAnswer
 (define apply-cont
-  (lambda (cont eval)
-    (cont eval)))
+  (lambda (cont aw)
+    (cont aw)))
 ;; continuations
 (define end-cont
   (lambda ()
-    (lambda (eval)
-      (printf "End of Computation, ~s\n" eval))))
+    (lambda (aw)
+      (printf "End of Computation, ~s\n" (answer->eval aw)))))
 (define if-cont
   (lambda (exp2 exp3 env cont)
-    (lambda (eval)
-      (if (expval->bool eval)
-          (value-of/k exp2 env cont)
-          (value-of/k exp3 env cont)))))
+    (lambda (aw)
+      (let* ((eval (answer->eval aw))
+             (store (answer->store aw))
+             (senv (cons env store)))
+        (if (expval->bool eval)
+            (value-of/k exp2 senv cont)
+            (value-of/k exp3 senv cont))))))
 (define let*-cont
   (lambda (vars exps body cont env)
-    (lambda (eval)
-      (let ((new-env (extend-env (car vars) eval env)))
+    (lambda (aw)
+      (let* ((eval (answer->eval aw))
+             (store (answer->store aw))
+             (new-senv (extend-senv (car vars) eval
+                                    (cons env store))))
         (if (null? exps)
-            (value-of/k body new-env cont)
+            (value-of/k body new-senv cont)
             (value-of/k (car exps)
-                        new-env
-                        (let*-cont (cdr vars) (cdr exps) body cont new-env)))))))
+                        new-senv
+                        (let*-cont (cdr vars) (cdr exps) body cont
+                                   (car new-senv))))))))
 (define let-cont
   (lambda (vars exps body cont ori-env env)
-    (lambda (eval)
-      (let ((new-env (extend-env (car vars) eval env)))
+    (lambda (aw)
+      (let* ((eval (answer->eval aw))
+             (store (answer->store aw))
+             (new-senv (extend-senv (car vars) eval
+                                    (cons env store))))
         (if (null? exps)
-            (value-of/k body new-env cont)
+            (value-of/k body new-senv cont)
             (value-of/k (car exps)
-                        ori-env
-                        (let-cont (cdr vars) (cdr exps) body cont ori-env new-env)))))))
+                        (cons ori-env (cdr new-senv))
+                        (let-cont (cdr vars) (cdr exps) body cont ori-env
+                                  (car new-senv))))))))
 (define cond-cont
   (lambda (exps1 exps2 env cont)
-    (lambda (eval)
-      (if (expval->bool eval)
-          (value-of/k (car exps2) env cont)
-          (value-of/k (car exps1)
-                      env
-                      (cond-cont (cdr exps1) (cdr exps2) env cont))))))
+    (lambda (aw)
+      (let* ((eval (answer->eval aw))
+             (store (answer->store aw))
+             (senv (cons env store)))
+        (if (expval->bool eval)
+            (value-of/k (car exps2) senv cont)
+            (if (null? exps1)
+                (eopl:error 'cond "None of the tests succeeds!")
+                (value-of/k (car exps1)
+                            senv
+                            (cond-cont (cdr exps1) (cdr exps2) env cont))))))))
 (define call-cont
   (lambda (rands env cont)
-    (lambda (eval)
-      (cases expval eval
-        (innerop-val (innerop)
-                     (cases inner-operator innerop
-                       (none-op (op)
-                                (apply-cont cont ((none-operator op))))
-                       (binary-op (op)
-                                  (value-of/k (car rands)
-                                              env
-                                              (binary-op-cont1 op (cdr rands) env cont)))
-                       (unary-op (op)
-                                 (value-of/k (car rands)
-                                             env
-                                             (unary-op-cont op cont)))
-                       (any-op (op)
-                               (if (null? rands)
-                                   (apply-cont cont ((any-operator op) '()))
+    (lambda (aw)
+      (let* ((eval (answer->eval aw))
+             (store (answer->store aw))
+             (senv (cons env store))
+             (make-answer (lambda(eval)
+                            (an-answer eval store))))
+        (cases expval eval
+          (innerop-val (innerop)
+                       (cases inner-operator innerop
+                         (none-op (op)
+                                  (apply-cont cont
+                                              (make-answer ((none-operator op)))))
+                         (binary-op (op)
+                                    (value-of/k (car rands)
+                                                senv
+                                                (binary-op-cont1 op (cdr rands) env cont)))
+                         (unary-op (op)
                                    (value-of/k (car rands)
-                                               env
-                                               (any-op-cont op (cdr rands) env cont '()))))
-                       ))
-        (proc-val (proc)
-                  (if (null? rands)
-                      (apply-procedure proc '() env cont)
-                      (value-of/k (car rands)
-                                  env
-                                  (proc-cont proc (cdr rands) env cont '()))))
-        (else
-         (eopl:error 'call-exp "can not apply on expval ~s" eval))
-        ))))
+                                               senv
+                                               (unary-op-cont op cont)))
+                         (any-op (op)
+                                 (if (null? rands)
+                                     (apply-cont cont
+                                                 (make-answer ((any-operator op) '())))
+                                     (value-of/k (car rands)
+                                                 senv
+                                                 (any-op-cont op (cdr rands) env cont '()))))
+                         ))
+          (proc-val (proc)
+                    (if (null? rands)
+                        (apply-procedure proc '() senv cont)
+                        (value-of/k (car rands)
+                                    senv
+                                    (proc-cont proc (cdr rands) env cont '()))))
+          (else
+           (eopl:error 'call-exp "can not apply on expval ~s" eval))
+          )))))
 (define binary-op-cont1
   (lambda (op rands env cont)
-    (lambda (eval)
-      (value-of/k (car rands)
-                  env
-                  (binary-op-cont2 op eval cont)))))
+    (lambda (aw)
+      (let* ((eval (answer->eval aw))
+             (store (answer->store aw))
+             (senv (cons env store)))
+        (value-of/k (car rands)
+                    senv
+                    (binary-op-cont2 op eval cont))))))
 (define binary-op-cont2
   (lambda (op eval1 cont)
-    (lambda (eval2)
+    (lambda (aw)
       (apply-cont cont
-                  ((binary-operator op) eval1 eval2)))))
+                  (an-answer
+                   ((binary-operator op) eval1
+                                         (answer->eval aw))
+                   (answer->store aw))))))
 (define unary-op-cont
   (lambda (op cont)
-    (lambda (eval)
+    (lambda (aw)
       (apply-cont cont
-                  ((unary-operator op) eval)))))
+                  (an-answer
+                   ((unary-operator op) (answer->eval aw))
+                   (answer->store aw))))))
 (define any-op-cont
   (lambda (op rands env cont vals)
-    (lambda (eval)
-      (let ((new-vals (append vals (list eval))))
+    (lambda (aw)
+      (let* ((eval (answer->eval aw))
+             (store (answer->store aw))
+             (new-vals (append vals (list eval))))
         (if (null? rands)
-            (apply-cont cont ((any-operator op) vals))
+            (apply-cont cont
+                        (an-answer
+                         ((any-operator op) vals)
+                         store))
             (value-of/k (car rands)
-                        env
+                        (cons env store)
                         (any-op-cont op (cdr rands) env cont new-vals)))))))
 (define proc-cont
   (lambda (proc rands env cont vals)
-    (lambda (eval)
-      (let ((new-vals (append vals (list eval))))
+    (lambda (aw)
+      (let* ((eval (answer->eval aw))
+             (store (answer->store aw))
+             (senv (cons env store))
+             (new-vals (append vals (list eval))))
         (if (null? rands)
-            (apply-procedure proc new-vals env cont)
+            (apply-procedure proc new-vals senv cont)
             (value-of/k (car rands)
-                        env
+                        senv
                         (proc-cont proc (cdr rands) env cont new-vals)))))))
 (define begin-cont
   (lambda (exps2 env cont)
-    (lambda (eval)
+    (lambda (aw)
       (if (null? exps2)
-          (apply-cont cont eval)
+          (apply-cont cont aw)
           (value-of/k (car exps2)
-                      env
+                      (cons env (answer->store aw))
                       (begin-cont (cdr exps2) env cont))))))
-
 (define make-let-cont-by-op
   (lambda (op vars exps body cont env)
     (if (equal? op "let*")
         (let*-cont vars exps body cont env)
         (let-cont vars exps body cont env env))))
+(define set-cond
+  (lambda (ident env cont)
+    (lambda (aw)
+      (let* ((eval (answer->eval aw))
+             (store (answer->store aw))
+             (ref (apply-env env ident)))
+        (apply-cont cont
+                    (an-answer eval
+                               (store->setref
+                                store
+                                ref
+                                eval)))))))
 
+;; Implatement operator function
 (define make-arithmetic-op
   (lambda (op)
     (lambda (eval1 eval2)
@@ -449,23 +610,8 @@
         (list-val
          (cons-val (car evals)
                    (expval->list (list-op (cdr evals))))))))
-(define extract-freevar-env-from-explist
-  (lambda (bindvars exps env nenv)
-    (foldl (lambda(exp nenv)
-             (extract-freevar-env bindvars exp env nenv))
-           nenv
-           exps)))
-(define extract-freevar-env-from-let*
-  (lambda (bindvars vars exps env nenv)
-    (if (null? vars) nenv
-        (let ((new-bindvars (if (list-member? (car vars) bindvars)
-                                bindvars
-                                (cons (car vars) bindvars))))
-          (extract-freevar-env-from-let* new-bindvars
-                                         (cdr vars)
-                                         (cdr exps)
-                                         env
-                                         (extract-freevar-env bindvars (car exps) env nenv))))))
+
+;; Extract freevar for procedure
 (define extract-freevar-env
   (lambda (bind-vars exp1 env nenv)
     (cases expression exp1
@@ -495,6 +641,25 @@
                 (extract-freevar-env-from-explist bind-vars exps2 env
                                                   (extract-freevar-env bind-vars exp1 env nenv)))
       (else nenv))))
+(define extract-freevar-env-from-explist
+  (lambda (bindvars exps env nenv)
+    (foldl (lambda(exp nenv)
+             (extract-freevar-env bindvars exp env nenv))
+           nenv
+           exps)))
+(define extract-freevar-env-from-let*
+  (lambda (bindvars vars exps env nenv)
+    (if (null? vars) nenv
+        (let ((new-bindvars (if (list-member? (car vars) bindvars)
+                                bindvars
+                                (cons (car vars) bindvars))))
+          (extract-freevar-env-from-let* new-bindvars
+                                         (cdr vars)
+                                         (cdr exps)
+                                         env
+                                         (extract-freevar-env bindvars (car exps) env nenv))))))
+
+;; Register operator function
 (define make-fun-table
   (lambda lst
     (lambda (op)
