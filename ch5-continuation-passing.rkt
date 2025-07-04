@@ -384,7 +384,7 @@
         (set-exp (ident exp1)
                  (value-of/k exp1
                              senv
-                             (set-cond ident env cont)))
+                             (set-cond (apply-env env ident) cont)))
         ))))
 
 ;; procedure representation of continuation
@@ -548,11 +548,10 @@
         (let*-cont vars exps body cont env)
         (let-cont vars exps body cont env env))))
 (define set-cond
-  (lambda (ident env cont)
+  (lambda (ref cont)
     (lambda (aw)
       (let* ((eval (answer->eval aw))
-             (store (answer->store aw))
-             (ref (apply-env env ident)))
+             (store (answer->store aw)))
         (apply-cont cont
                     (an-answer eval
                                (store->setref
