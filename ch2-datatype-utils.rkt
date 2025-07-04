@@ -1,8 +1,9 @@
 #lang racket
 
-(provide list-of list-member? remove-by-idx debug-fun printf-hlmsg debug-info)
+(provide list-of list-member? remove-by-idx debug-fun printf-hlmsg debug-info debug-trace)
 
 (define DEBUG #f)
+(define TRACE #f)
 
 (define remove-by-idx
   (lambda (lst idx)
@@ -57,3 +58,11 @@
     (if DEBUG
         (apply printf-hlmsg key form vars)
         'none)))
+(define make-debug-fun
+  (lambda (sw)
+    (lambda (key form . vars)
+      (if sw
+          (apply printf-hlmsg key form vars)
+          'none))))
+(define debug-trace
+  (make-debug-fun TRACE))

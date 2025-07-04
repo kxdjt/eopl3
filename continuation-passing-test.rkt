@@ -1,6 +1,7 @@
 #lang racket
 
-(require "ch5-continuation-passing.rkt")
+#| (require "ch5-continuation-passing.rkt") |#
+(require "ch5-continuation-list.rkt")
 #| (require "ch5-continuation-passing-by-dt.rkt") |#
 
 
@@ -50,14 +51,14 @@
   "letrec fact(n) = if (zero? n)
                     then 1
                     else (* n (fact (- n 1)))
-     in (fact 4)")
+     in (fact 8)")
 (define fact-iter-test
   "letrec fact-iter-acc(n a) =
                     if (zero? n) then a
                     else (fact-iter-acc (- n 1) (* n a))
      in let fact-iter=proc(n)
                       (fact-iter-acc n 1)
-         in (fact-iter 4)")
+         in (fact-iter 8)")
 (define list-test
   "(list 1 (list 2) 3 (list))")
 (define implicit-refs-test
