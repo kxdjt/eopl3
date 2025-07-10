@@ -24,14 +24,14 @@
     (number ((or digit (concat "-" digit)) (arbno digit)) number)
     (identifier (letter (arbno (or letter digit "?" "-"))) symbol)
     (binary-op ((or "+" "-" "*" "/" "equal?" "greater?" "less?" "cons")) string)
-    (unary-op ((or "not" "minus" "zero?" "car" "cdr" "null?")) string)
+    (unary-op ((or "minus" "zero?" "car" "cdr" "null?")) string)
     (none-op ((or "emptylist")) string)
     (any-op ((or "list")) string)
     (let-op ((or "let" "let*")) string)
     (proc-op ((or "proc" "traceproc" "dyproc")) string)
     ))
 (define grammar-let
-  '((program (statement) a-program)
+  '((program (expression) a-program)
     (expression (number) const-exp)
     (expression ("if" expression "then" expression "else" expression) if-exp)
     (expression (identifier) var-exp)
@@ -61,32 +61,6 @@
     ;;-----------Store Interface------------------
     ;;Expression ::= set identifier = expression
     (expression ("set" identifier "=" expression) set-exp)
-    ;;-----------Statement Interface--------------
-    ;;Statement ::= identifier = expression
-    (statement (identifier "=" expression) assign-stmt)
-    ;;Statement ::= print expression
-    (statement ("print" expression) print-stmt)
-    ;;Statement ::= {{statement}*(;)}
-    (statement ( "{" (separated-list statement ";") "}") order-stmt)
-    ;;Statement ::= if expression statement statement
-    (statement ( "if" expression statement statement) if-stmt)
-    ;;Statement ::= while expression statement
-    (statement ( "while" expression statement) while-stmt)
-    ;;Statement ::= do statement while experssion
-    (statement ( "do" statement "while" expression) do-while-stmt)
-    ;;Statement ::= var {identifier}*(,) ; statement
-    (statement ( "var" (separated-list identifier ",") ";" statement) block-stmt)
-    ;;Statement ::= var {identifier = expression}*(,) ; statement
-    (statement ( "var*" (separated-list identifier "=" expression ",") ";" statement) block*-stmt)
-    ;;Statement ::= vars {identifier = initializtion}*(,) ; statement
-    (statement ( "pvar" (separated-list identifier "=" initializtion ",") ";" statement) block-proc-stmt)
-    ;;Statement ::= identifier ( {experssion}* )
-    (statement ( "[" identifier (arbno expression) "]" ) call-stmt)
-    ;;Statement ::= read identitifer
-    (statement ( "read" identifier) read-stmt)
-    ;;-----------Initializtion Interface--------------
-    (initializtion ( "proc" "(" (separated-list identifier ",") ")" expression) proc-init)
-    (initializtion ( "subr" "(" (separated-list identifier ",") ")" statement) subr-init)
     ))
 
 (sllgen:make-define-datatypes scanner-spec-let grammar-let)
@@ -101,7 +75,7 @@
 ;; run : string -> ExpVal
 (define run
   (lambda (string)
-    (result-of-program (scan&parse string))))
+    (value-of-program (scan&parse string))))
 (define init-senv
   (lambda ()
     (extend-senv 'i (num-val 1)
@@ -109,13 +83,21 @@
                               (extend-senv 'x (num-val 10)
                                            (empty-senv))))))
 
-;; Program -> none
-(define result-of-program
+;; Program -> FinalAnswer = ExpVal
+(define value-of-program
   (lambda (pgm)
     (cases program pgm
       (a-program (exp1)
-                 (result-of/k exp1 (init-senv) (end-com-cont))
-                 "run success!"))))
+                 (trampolined
+                  (value-of/k exp1 (init-senv) (end-cont)))))))
+
+#| Trampolining |#
+;; Bounce -> Expval
+(define trampolined
+  (lambda (bounce)
+    (if (expval? bounce)
+        bounce
+        (trampolined (bounce)))))
 
 #| Format print |#
 (define expval->fmt
@@ -137,12 +119,9 @@
 (define make-format-fun
   (lambda (left right)
     (lambda strs
-    (string-append
-     (apply string-append left strs)
-     right))))
-(define make-stmt-str
-  #| (make-format-fun "<|" "|>")) |#
-  (make-format-fun "" ""))
+      (string-append
+       (apply string-append left strs)
+       right))))
 (define make-exp-str
   #| (make-format-fun "<<" ">>")) |#
   (make-format-fun "" ""))
@@ -177,189 +156,99 @@
                        (apply make-seplst-str transfun
                               sep-str
                               (cdrs lsts))))))
-(define stmt->fmt
-  (lambda (stmt)
-    (cases statement stmt
-      (assign-stmt (ident exp1)
-                   (make-stmt-str (tostring ident) "=" (exp->fmt exp1)))
-      (print-stmt (exp1)
-                  (make-stmt-str "print " (exp->fmt exp1)))
-      (order-stmt (stmts)
-                  (make-stmt-str "{"
-                                 (make-seplst-str stmt->fmt
-                                                  ";"
-                                                  stmts)
-                                 "}"))
-      (if-stmt (exp1 stmt1 stmt2)
-               (make-stmt-str "if " (exp->fmt exp1)
-                              " then " (stmt->fmt stmt1)
-                              " else " (stmt->fmt stmt2)))
-      (while-stmt (exp1 stmt1)
-               (make-stmt-str "while "
-                              (exp->fmt exp1)
-                              (stmt->fmt stmt1)))
-      (do-while-stmt (stmt1 exp1)
-                (make-stmt-str "do "
-                               (stmt->fmt stmt1)
-                               " while "
-                               (exp->fmt exp1)))
-      (block-stmt (idents stmt)
-                (make-stmt-str "var "
-                               (make-seplst-str (lambda(ident) 
-                                                  (tostring ident))
-                                                ","
-                                                idents)
-                               ";"
-                               (stmt->fmt stmt)))
-      (block*-stmt (idents exps stmt)
-                (make-stmt-str "var* "
-                               (make-seplst-str (lambda(ident exp)
-                                                  (string-append (tostring ident)
-                                                                 "="
-                                                                 (exp->fmt exp)))
-                                                ","
-                                                idents
-                                                exps)
-                               ";\n"
-                               (stmt->fmt stmt)))
-      (block-proc-stmt (idents inits stmt)
-                (make-stmt-str "pvar "
-                               (make-seplst-str (lambda(ident init)
-                                                  (string-append (tostring ident)
-                                                                 "="
-                                                                 (init->fmt init)))
-                                                ",\n"
-                                                idents
-                                                inits)
-                               ";\n"
-                               (stmt->fmt stmt)))
-      (call-stmt (ident exps)
-                (make-stmt-str "["
-                               (tostring ident)
-                               " "
-                               (make-seplst-str (lambda(exp)
-                                                  (exp->fmt exp))
-                                                " "
-                                                exps)
-                               "]"))
-      (read-stmt (ident)
-                 (make-stmt-str "read "
-                                (tostring ident)))
-      )))
 (define exp->fmt
   (lambda (exp)
     (cases expression exp
       (const-exp (num)
-          (make-exp-str (tostring num)))
+                 (make-exp-str (tostring num)))
       (if-exp (exp1 exp2 exp3)
-          (make-exp-str "if "
-                        (exp->fmt exp1)
-                        " then "
-                        (exp->fmt exp2)
-                        " else "
-                        (exp->fmt exp3)))
+              (make-exp-str "if "
+                            (exp->fmt exp1)
+                            " then "
+                            (exp->fmt exp2)
+                            " else "
+                            (exp->fmt exp3)))
       (var-exp (ident)
-          (make-exp-str (tostring ident)))
+               (make-exp-str (tostring ident)))
       (let-exp (op vars exps body)
-          (make-exp-str op
-                        (make-seplst-str (lambda(var exp)
-                                           (string-append var
-                                                          "="
-                                                          (exp->fmt exp)))
-                                         " "
-                                         vars
-                                         exps)
-                        " in "
-                        (exp->fmt body)))
+               (make-exp-str op
+                             (make-seplst-str (lambda(var exp)
+                                                (string-append (tostring var)
+                                                               "="
+                                                               (exp->fmt exp)))
+                                              " "
+                                              vars
+                                              exps)
+                             " in "
+                             (exp->fmt body)))
       (letrec-exp (proc-names list-of-vars exps1 exp2)
-          (make-exp-str "letrec "
-                        (make-seplst-str (lambda(proc-name vars exp)
-                                           (string-append proc-name
-                                                          "("
-                                                          (make-seplst-str (lambda(var)
-                                                                             var)
-                                                                           " "
-                                                                           vars)
-                                                          ")"
-                                                          (exp->fmt exp)))
-                                         " "
-                                         proc-names
-                                         list-of-vars
-                                         exps1)
-                        " in "
-                        (exp->fmt exp2)))
+                  (make-exp-str "letrec "
+                                (make-seplst-str (lambda(proc-name vars exp)
+                                                   (string-append (tostring proc-name)
+                                                                  "("
+                                                                  (make-seplst-str (lambda(var)
+                                                                                     (tostring var))
+                                                                                   " "
+                                                                                   vars)
+                                                                  ")"
+                                                                  (exp->fmt exp)))
+                                                 " "
+                                                 proc-names
+                                                 list-of-vars
+                                                 exps1)
+                                " in "
+                                (exp->fmt exp2)))
       (cond-exp (exps1 exps2)
-          (make-exp-str "cond"
-                        "{"
-                        (make-seplst-str (lambda(exp1 exp2)
-                                           (string-append (exp->fmt exp1)
-                                                          "==>"
-                                                          (exp->fmt exp2)))
-                                         " "
-                                         exps1
-                                         exps2)
-                        "}"))
+                (make-exp-str "cond"
+                              "{"
+                              (make-seplst-str (lambda(exp1 exp2)
+                                                 (string-append (exp->fmt exp1)
+                                                                "==>"
+                                                                (exp->fmt exp2)))
+                                               " "
+                                               exps1
+                                               exps2)
+                              "}"))
       (proc-exp (op vars body)
-          (make-exp-str op
-                        "("
-                        (make-seplst-str (lambda(var)
-                                           (tostring var))
-                                         ","
-                                         vars)
-                        ")"
-                        (exp->fmt body)))
+                (make-exp-str op
+                              "("
+                              (make-seplst-str (lambda(var)
+                                                 (tostring var))
+                                               ","
+                                               vars)
+                              ")"
+                              (exp->fmt body)))
       (call-exp (exp1 exps2)
-          (make-exp-str "("
-                        (exp->fmt exp1)
-                        (make-seplst-str (lambda(exp)
-                                           (exp->fmt exp))
-                                         " "
-                                         exps2)
-                        ")"))
+                (make-exp-str "("
+                              (exp->fmt exp1)
+                              (make-seplst-str (lambda(exp)
+                                                 (exp->fmt exp))
+                                               " "
+                                               exps2)
+                              ")"))
       (begin-exp (exp1 exps2)
-          (make-exp-str "begin"
-                        (exp->fmt exp1)
-                        (make-seplst-str (lambda(exp)
-                                           (exp->fmt exp))
-                                         ";"
-                                         exps2)
-                        "end"))
+                 (make-exp-str "begin"
+                               (exp->fmt exp1)
+                               (make-seplst-str (lambda(exp)
+                                                  (exp->fmt exp))
+                                                ";"
+                                                exps2)
+                               "end"))
       (set-exp (ident exp1)
-          (make-exp-str "set"
-                        (tostring ident)
-                        "="
-                        (exp->fmt exp1)))
+               (make-exp-str "set"
+                             (tostring ident)
+                             "="
+                             (exp->fmt exp1)))
       (innerop-exp (inner-op)
-          (innerop->fmt inner-op))
+                   (innerop->fmt inner-op))
       )))
 (define innerop->fmt
   (lambda (inner-op)
     (cases inner-operator inner-op
-        (none-op (op) op)
-        (binary-op (op) op)
-        (unary-op (op) op)
-        (any-op (op) op))))
-(define init->fmt
-  (lambda (init)
-    (cases initializtion init
-      (proc-init (idents exp1)
-        (string-append "proc "
-                       "("
-                       (make-seplst-str (lambda(ident)
-                                          (tostring ident))
-                                        ","
-                                        idents)
-                       ")"
-                       (exp->fmt exp1)))
-      (subr-init (idents stmt)
-        (string-append "subr "
-                       "("
-                       (make-seplst-str (lambda(ident)
-                                          (tostring ident))
-                                        ","
-                                        idents)
-                       ")"
-                       (stmt->fmt stmt))))))
+      (none-op (op) op)
+      (binary-op (op) op)
+      (unary-op (op) op)
+      (any-op (op) op))))
 
 #| Expressed values for the LET language |#
 (define-datatype expval expval?
@@ -458,19 +347,14 @@
       (value-of/k body
                   (extend-senv* vars vals senv)
                   cont))))
-;; Proc * Vals * Senv * Cont -> FinalAnswer
-(define apply-procedure
+;; Proc * Vals * Senv * Cont -> '()->Bounce'
+(define apply-procedure/k
   (lambda (proc vals senv cont)
-    (debug-trace "apply-procedure" "proc:~s vals:~s\n" proc vals)
-    (proc vals senv cont)))
+    (lambda ()
+      (proc vals senv cont))))
 (define proc?
   (lambda (proc)
     (procedure? proc)))
-;; Define subroutine data type by schema procedure
-(define subroutine
-  (lambda (vars body env)
-    (lambda (vals senv ccont)
-      (result-of/k body (extend-senv* vars vals (cons env (cdr senv))) ccont))))
 
 (define extend-senv-rec*
   (lambda (proc-names list-of-vars exps senv)
@@ -564,21 +448,13 @@
   (lambda (vars evals senv)
     (if (null? vars)
         senv
-        (let* ((is-uninit (null? evals))
-               (next-evals (if is-uninit
-                               evals
-                               (cdr evals)))
-               (eval (if is-uninit
-                         (num-val 0)
-                         (car evals))))
-          (extend-senv* (cdr vars) next-evals
-                        (extend-senv (car vars)
-                                     eval
-                                     senv))))))
+        (extend-senv* (cdr vars) (cdr evals)
+                      (extend-senv (car vars)
+                                   (car evals)
+                                   senv)))))
 ;; (env . store)*var -> val
 (define apply-senv
   (lambda (senv var)
-    #| (debug-trace "apply-senv" "senv:~s var:~s\n" senv var) |#
     (let* ((env (car senv))
            (store (cdr senv))
            (ref (apply-env env var)))
@@ -599,13 +475,13 @@
     (cases answer aw
       (an-answer (_ s) s))))
 
-;; Exp * Env * Cont -> FinalAnswer
+;; Exp * Env * Cont -> Bounce
 (define value-of/k
   (lambda (exp senv cont)
-    (debug-trace "value-of/k" "exp:~s\n env:~s\n store:~s\n" (exp->fmt exp) (car senv) (cdr senv))
-      (let ((res (value-of/k-imp exp senv cont)))
-        #| (debug-trace "value-of/k" "res:~s\n" res) |#
-        res)))
+    (debug-trace "value-of/k" "exp:~s\n" (exp->fmt exp))
+    (let ((res (value-of/k-imp exp senv cont)))
+      (debug-trace "value-of/k" "res:~s\n" res)
+      res)))
 (define value-of/k-imp
   (lambda (exp senv cont)
     (let* ((store (cdr senv))
@@ -618,7 +494,6 @@
                                (make-answer
                                 (num-val num))))
         (var-exp (var)
-                 #| (debug-trace "test" "is-var:~s cont:~s\n" var cont) |#
                  (apply-cont cont
                              (make-answer
                               (apply-senv senv var))))
@@ -664,16 +539,15 @@
         ))))
 
 ;; procedure representation of continuation
-;; Cont * Answer -> FinalAnswer
+;; Cont * Answer -> Bounce
 (define apply-cont
   (lambda (cont aw)
-    #| (debug-trace "apply-cont" "cont:~s aw:~s\n" cont aw) |#
     (cont aw)))
 ;; continuations
 (define end-cont
   (lambda ()
     (lambda (aw)
-      (printf "End of Computation. \n") 
+      (printf "End of Computation. \n")
       (answer->eval aw))))
 (define if-cont
   (lambda (exp2 exp3 env cont)
@@ -755,7 +629,7 @@
                          ))
           (proc-val (proc)
                     (if (null? rands)
-                        (apply-procedure proc '() senv cont)
+                        (apply-procedure/k proc '() senv cont)
                         (value-of/k (car rands)
                                     senv
                                     (proc-cont proc (cdr rands) env cont '()))))
@@ -782,7 +656,6 @@
 (define unary-op-cont
   (lambda (op cont)
     (lambda (aw)
-      #| (debug-trace "unary-op-cont" "op:~s cont:~s\n" op cont) |#
       (apply-cont cont
                   (an-answer
                    ((unary-operator op) (answer->eval aw))
@@ -809,7 +682,7 @@
              (senv (cons env store))
              (new-vals (append vals (list eval))))
         (if (null? rands)
-            (apply-procedure proc new-vals senv cont)
+            (apply-procedure/k proc new-vals senv cont)
             (value-of/k (car rands)
                         senv
                         (proc-cont proc (cdr rands) env cont new-vals)))))))
@@ -865,10 +738,6 @@
         (bool-val #t)
         (bool-val #f)
         )))
-(define not-op
-  (lambda (eval)
-    (bool-val
-      (not (expval->bool eval)))))
 (define minus-op
   (lambda (eval)
     (num-val (- (expval->num eval)))))
@@ -964,7 +833,6 @@
    (cons "car" car-op)
    (cons "cdr" cdr-op)
    (cons "null?" null?-op)
-   (cons "not" not-op)
    ))
 (define none-operator
   (make-fun-table
@@ -980,213 +848,3 @@
    #| (cons "traceproc" traceproc) |#
    (cons "dyproc" dynamicproc)
    ))
-
-
-;; statement * senv * CCont -> Final
-(define result-of/k
-  (lambda (stmt senv ccont)
-    (let* ((env (car senv))
-           (store (cdr senv)))
-      (debug-trace "result-of" "stmt:~s\n store:~s\n" (stmt->fmt stmt) store)
-      (let ((res (result-of/k-imp stmt senv ccont)))
-        #| (debug-trace "result-of" "res:~s\n" res) |#
-        res))))
-
-(define end-cont-st
-  (lambda ()
-    (lambda (aw)
-      aw)))
-(define value-of
-  (lambda (exp1 senv)
-    (debug-trace "value-of" "exp:~s\n env:~s\n store:~s\n" (exp->fmt exp1) (car senv) (cdr senv))
-    (let ((res (value-of/k exp1 senv (end-cont-st))))
-        (debug-trace "value-of" "res:~s\n" res)
-        res)))
-
-(define result-of/k-imp
-  (lambda (stmt senv ccont)
-    (cases statement stmt
-      (assign-stmt (ident exp1)
-                   (apply-command-cont ccont
-                                       (assign-handler ident exp1 senv)))
-      (print-stmt (exp1)
-                  (apply-command-cont ccont
-                                      (print-handler exp1 senv)))
-      (order-stmt (stmts)
-                  (if (null? stmts)
-                      (apply-command-cont ccont
-                                          (cdr senv))
-                      (result-of/k (car stmts) senv
-                                   (order-ccont (cdr stmts) (car senv) ccont))))
-      (if-stmt (exp1 stmt1 stmt2)
-               (if-handler exp1 stmt1 stmt2 senv ccont))
-      (while-stmt (exp1 stmt1)
-                  (while-handler exp1 stmt1 senv ccont))
-      (do-while-stmt (stmt1 exp1)
-                     (result-of/k stmt1 senv
-                                  (do-while-ccont stmt1 exp1 (car senv) ccont)))
-      (block-stmt (idents stmt)
-                  (result-of/k stmt
-                               (extend-senv* idents
-                                             '()
-                                             senv)
-                               ccont))
-      (block*-stmt (idents exps stmt)
-                   (block-handler* idents exps stmt senv ccont))
-      (block-proc-stmt (idents inits stmt)
-                       (block-proc-handler idents inits stmt senv ccont))
-      (read-stmt (ident)
-                 (read-handler ident senv ccont))
-      (call-stmt (ident exps)
-                 (call-handler ident exps senv ccont))
-      )))
-
-(define assign-handler
-  (lambda (ident exp1 senv)
-    (let ((aw (value-of exp1 senv))
-          (ref (apply-env (car senv) ident)))
-      (store->setref
-       (answer->store aw)
-       ref
-       (answer->eval aw)))))
-(define print-handler
-  (lambda (exp1 senv)
-    (let ((aw (value-of exp1 senv)))
-      (printf "print: ~s\n" (answer->eval aw))
-      (answer->store aw))))
-(define if-handler
-  (lambda (exp1 stmt1 stmt2 senv ccont)
-    (let* ((aw (value-of exp1 senv))
-           (new-senv (cons (car senv)
-                           (answer->store aw))))
-      (if (expval->bool (answer->eval aw))
-          (result-of/k stmt1 new-senv ccont)
-          (result-of/k stmt2 new-senv ccont)))))
-(define while-handler
-  (lambda (exp1 stmt1 senv ccont)
-    (let* ((aw (value-of exp1 senv))
-           (new-senv (cons (car senv)
-                           (answer->store aw))))
-      (if (expval->bool (answer->eval aw))
-          (result-of/k stmt1 new-senv
-                       (while-ccont exp1 stmt1 (car senv) ccont))
-          (apply-command-cont ccont (answer->store aw))))))
-(define block-handler*
-  (lambda (idents exps stmt senv ccont)
-    (if (null? idents)
-        (result-of/k stmt senv ccont)
-        (block-handler* (cdr idents)
-                        (cdr exps)
-                        stmt
-                        (let* ((aw (value-of (car exps) senv)))
-                          (extend-senv
-                           (car idents)
-                           (answer->eval aw)
-                           (cons (car senv)
-                                 (answer->store aw))))
-                        ccont))))
-(define block-proc-handler
-  (lambda (idents inits stmt senv ccont)
-    (define make-env
-      (lambda (vars s-ref env)
-        (if (null? vars)
-            env
-            (make-env (cdr vars) (+ s-ref 1)
-                      (extend-env
-                       (car vars)
-                       s-ref
-                       env)))))
-    (define make-store
-      (lambda (inits s-ref env store)
-        (if (null? inits)
-            store
-            (make-store (cdr inits) (+ s-ref 1) env
-                        (extend-store s-ref
-                                      (cases initializtion (car inits)
-                                        (proc-init (idents exp1)
-                                                   (proc-val
-                                                    (procedure idents
-                                                                    exp1
-                                                                    env)))
-                                        (subr-init (idents stmt1)
-                                                   (proc-val
-                                                    (subroutine idents
-                                                                stmt1
-                                                                env))))
-                                      store)))))
-    (let* ((store (cdr senv))
-           (ref (store->nextref store))
-           (env (make-env idents ref (car senv))))
-      (result-of/k stmt
-                   (cons env
-                         (make-store inits ref
-                                     env
-                                     store))
-                   ccont))))
-(define read-handler
-  (lambda (ident senv ccont)
-    (apply-command-cont ccont
-                        (store->setref (cdr senv)
-                                       (apply-env (car senv) ident)
-                                       (num-val (read))))))
-(define call-handler
-  (lambda (ident exps senv ccont)
-    (let* ((rator (apply-senv senv ident))
-           (ostore (cdr senv))
-           (env (car senv))
-           (res (foldl (lambda(exp res)
-                         (let* ((vals (car res))
-                                (last-store (cdr res))
-                                (aw (value-of exp (cons env last-store))))
-                           (cons
-                            (cons (answer->eval aw) vals)
-                            (answer->store aw))))
-                       (cons '() ostore)
-                       exps))
-           (rands (car res))
-           (store (cdr res)))
-      (cases expval rator
-        (proc-val (proc)
-                  (apply-procedure proc
-                                   rands
-                                   (cons env store)
-                                   (lambda(res)
-                                     (if (answer? res)
-                                       (ccont (answer->store res))
-                                       (ccont res))))
-                  )
-        (else
-         (eopl:error 'call-stmt "can not apply on expval ~s" rator))))))
-
-(define end-com-cont
-  (lambda ()
-    (lambda (store)
-      (printf "End of Computation\n" ))))
-(define order-ccont
-  (lambda (stmts env ccont)
-    (lambda (store)
-      (if (null? stmts)
-          (apply-command-cont ccont store)
-          (result-of/k (car stmts) (cons env store)
-                       (order-ccont (cdr stmts) env ccont))))))
-(define while-ccont
-  (lambda (exp1 stmt1 env ccont)
-    (lambda (store)
-      (let* ((aw (value-of exp1 (cons env store)))
-             (new-senv (cons env (answer->store aw))))
-        (if (expval->bool (answer->eval aw))
-            (result-of/k stmt1 new-senv
-                         (while-ccont exp1 stmt1 env ccont))
-            (apply-command-cont ccont (answer->store aw)))))))
-(define do-while-ccont
-  (lambda (stmt1 exp1 env ccont)
-    (lambda (store)
-      (let* ((aw (value-of exp1 (cons env store)))
-             (new-senv (cons env (answer->store aw))))
-        (if (expval->bool (answer->eval aw))
-            (result-of/k stmt1 new-senv
-                         (do-while-ccont stmt1 exp1 env ccont))
-            (apply-command-cont ccont (answer->store aw)))))))
-(define apply-command-cont
-  (lambda (ccont store)
-    (ccont store)))
