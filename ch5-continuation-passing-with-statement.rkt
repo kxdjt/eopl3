@@ -683,7 +683,8 @@
 (define end-cont
   (lambda ()
     (lambda (aw)
-      (printf "End of Computation, ~s\n" (answer->eval aw)))))
+      (printf "End of Computation. \n") 
+      (answer->eval aw))))
 (define if-cont
   (lambda (exp2 exp3 env cont)
     (lambda (aw)
@@ -1199,4 +1200,3 @@
 (define apply-command-cont
   (lambda (ccont store)
     (ccont store)))
-

@@ -402,7 +402,8 @@
     (cons
      (cons
       (lambda (aw . _)
-        (printf "End of Computation, ~s\n" (answer->eval aw)))
+        (printf "End of Computation. \n")
+        (answer->eval aw))
       '())
      '())))
 (define if-cont

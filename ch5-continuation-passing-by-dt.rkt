@@ -320,7 +320,8 @@
   (lambda (cont eval)
     (cases continuation cont
       (end-cont ()
-                (printf "End of Computation, ~s\n" eval))
+                (printf "End of Computation. \n")
+                eval)
       (if-cont (exp2 exp3 env cont)
                (if (expval->bool eval)
                    (value-of/k exp2 env cont)
