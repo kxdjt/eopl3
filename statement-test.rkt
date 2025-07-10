@@ -1,6 +1,7 @@
 #lang racket
 
-(require "ch4-statement-oriented.rkt")
+#| (require "ch4-statement-oriented.rkt") |#
+(require "ch5-continuation-passing-with-statement.rkt")
 
 (define statement-test1
   "var x,y; {x= 3;y = 4;print (+ x y)}")
@@ -54,5 +55,4 @@
    pvar even = proc(x) if (zero? x) then 1 else (odd (- x a)),
         odd  = proc(x) if (zero? x) then 0 else (even (- x b)),
         st = subr(x) {z = (+ x (odd 13)); print z};
-   [st 2]")
-
+   {[st 2];[odd 2]}")
