@@ -9,6 +9,7 @@
 (require "fmt.rkt")
 (require racket/lazy-require)
 (lazy-require ["continuation-interface.rkt" (apply-cont)])
+(lazy-require ["continuation-interface.rkt" (try-handler)])
 
 #| (provide value-of/k) |#
 (provide (all-defined-out))
@@ -77,7 +78,7 @@
         (try-exp (exp1 ident exp2)
                  (value-of/k exp1
                              senv
-                             (try-cont ident exp2 (car senv) cont)))
+                             (try-handler ident exp2 (car senv) cont)))
         (raise-exp (exp1)
                    (value-of/k exp1
                                senv

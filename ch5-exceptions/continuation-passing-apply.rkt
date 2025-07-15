@@ -156,16 +156,28 @@
                 (answer->eval aw))
       )))
 
+(define try-cont-list '())
+
+(define try-handler
+  (lambda (ident exp2 env cont)
+    (let ((t-cont (try-cont ident exp2 env cont)))
+      (set! try-cont-list (cons t-cont try-cont-list))
+      t-cont)))
+
 (define apply-handler
   (lambda (cont aw)
-    (debug-trace "apply-handler" "cont:~s\n" cont)
-    (cases continuation cont
-      (try-cont (ident exp2 env cont)
-                (apply-procedure/k (procedure (list ident)
-                                              exp2
-                                              env)
-                                   (list (answer->eval aw))
-                                   (cons env (answer->store aw))
-                                   cont))
-      (else
-       (apply-handler (cont->nextcont cont) aw)))))
+    (debug-trace "apply-handler" "cont:~s\n try-cont-list:~s\n" cont try-cont-list)
+    (if (null? try-cont-list)
+        (eopl:error 'apply-handler "Not found try-cont!")
+        (let ((t-cont (car try-cont-list)))
+          (set! try-cont-list (cdr try-cont-list))
+          (cases continuation t-cont
+            (try-cont (ident exp2 env cont)
+                      (apply-procedure/k (procedure (list ident)
+                                                    exp2
+                                                    env)
+                                         (list (answer->eval aw))
+                                         (cons env (answer->store aw))
+                                         cont))
+            (else
+             (eopl:error 'apply-handler "Is not try-cont! cont:~s\n" cont)))))))
