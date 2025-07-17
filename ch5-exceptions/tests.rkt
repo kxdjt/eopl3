@@ -69,7 +69,7 @@
         in let b = (g 11)
             in (- a b)")
 (define exception-test
-  " let index = proc (n)
+  "let index = proc (n)
                 letrec inner (lst)=
                         if (null? lst)
                         then raise 99
@@ -80,4 +80,10 @@
                       try (inner lst)
                       catch (x)-1
     in ((index 5) (list 2 3))")
-
+(define exception-test2
+  "let fun = proc (x ,y)
+             (+ x y)
+       in begin
+          try (fun ) catch (x) x;
+          try (fun 1 2) catch (x) x
+          end")

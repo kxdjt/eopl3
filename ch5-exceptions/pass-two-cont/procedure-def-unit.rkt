@@ -3,11 +3,14 @@
 (require "../procedure-sig.rkt")
 (require "../senv-unit.rkt")
 (require "continuation-interface-sig.rkt")
+(require "continuations-sig.rkt")
+(require "../store-unit.rkt")
+(require "../data-structures-unit.rkt")
 
 (provide proc-def@)
 
 (define-unit proc-def@
-  (import senv^ cont-valueof^)
+  (import senv^ cont-valueof^ continuation^ store^ data-structures^)
   (export proc-def^)
 
   ;; Define procedure data type by scheme procedure
@@ -17,10 +20,18 @@
       (lambda (vals senv cont econt)
         (let* ((store (cdr senv))
                (new-senv (cons env store)))
-          (value-of/k body
-                      (extend-senv* vars vals new-senv)
-                      cont
-                      econt)))))
+          (if (equal? (length vars) (length vals))
+              (value-of/k body
+                          (extend-senv* vars vals new-senv)
+                          cont
+                          econt)
+              (begin
+                (printf "Call with the wrong number of arguments! vars:~s vals:~s \n" vars vals)
+                (apply-cont econt
+                            econt
+                            (an-answer (num-val -1)
+                                       store))
+                ))))))
   #| (define traceproc |#
   #|   (lambda (vars body env) |#
   #|     (let ((env (extract-freevar-env vars body env (empty-env)))) |#
