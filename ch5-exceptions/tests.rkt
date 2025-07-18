@@ -87,3 +87,10 @@
           try (fun ) catch (x) x;
           try (fun 1 2) catch (x) x
           end")
+(define exception-test3
+  "let fun = proc(x,y)
+              (/ x y)
+       in begin
+          try (fun 2 1) catch (x) x;
+          try (fun 2 0) catch (x) x
+          end")

@@ -191,11 +191,16 @@
                                        (binary-op-cont2 op eval cont)
                                        econt)))
         (binary-op-cont2 (op eval1 cont)
-                         (apply-cont cont econt
-                                     (an-answer
-                                      ((binary-operator op) eval1
-                                                            (answer->eval aw))
-                                      (answer->store aw))))
+                         (if (and (equal? op "/") (zero? (expval->num (answer->eval aw))))
+                             (begin
+                               (printf "Division by zero! (~s ~s ~s)\n" op eval1 (answer->eval aw))
+                               (apply-cont econt econt (an-answer (num-val -1)
+                                                                  (answer->store aw))))
+                             (apply-cont cont econt
+                                         (an-answer
+                                          ((binary-operator op) eval1
+                                                                (answer->eval aw))
+                                          (answer->store aw)))))
         (unary-op-cont (op cont)
                        (apply-cont cont econt
                                    (an-answer
