@@ -19,7 +19,8 @@
    except-cont
    try-cont
    empty-econt
-   make-let-cont-by-op)
+   make-let-cont-by-op
+   change-nextcont)
   )
 
 (provide continuation^)

@@ -94,3 +94,14 @@
           try (fun 2 1) catch (x) x;
           try (fun 2 0) catch (x) x
           end")
+(define exception-test4
+  "let fun = proc(x, y)
+              (/ x y)
+         in let run=proc()
+                    begin
+                      raise -1;
+                      (fun 2 1)
+                    end
+              in try (run)
+                 catch (x) x")
+

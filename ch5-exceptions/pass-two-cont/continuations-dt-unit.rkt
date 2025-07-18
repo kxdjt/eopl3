@@ -262,4 +262,11 @@
         (empty-econt ()
                      (printf "Not find exception-cont! \n"))
         )))
+  (define change-nextcont
+    (lambda (cont ncont)
+      (cases continuation cont
+        (except-cont (ident exp2 env econt ocont)
+                     (except-cont ident exp2 env econt ncont))
+        (else
+         (eopl:error 'change-nextcont "Do not support! cont:~s\n" cont)))))
   )

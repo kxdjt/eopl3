@@ -92,7 +92,7 @@
           (raise-exp (exp1)
                      (value-of/k exp1
                                  senv
-                                 econt
+                                 (change-nextcont econt cont)
                                  econt))
           ))))
   )
