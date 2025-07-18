@@ -105,3 +105,23 @@
               in try (run)
                  catch (x) x")
 
+(define exception-test5
+  "let fun = proc(x, y)
+              (/ x y)
+         in let run=proc()
+                    begin
+                      raise -1 curcont endraise;
+                      (fun 2 1)
+                    end
+              in try (run)
+                 catch (x) x")
+(define exception-test6
+  "let fun = proc(x, y)
+              (/ x y)
+         in let run=proc()
+                    begin
+                      raise -1 endraise;
+                      (fun 2 1)
+                    end
+              in try (run)
+                 catch (x) x")
