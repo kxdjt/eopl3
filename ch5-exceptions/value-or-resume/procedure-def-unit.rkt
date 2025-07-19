@@ -14,6 +14,14 @@
   (export proc-def^)
 
   ;; Define procedure data type by scheme procedure
+  (define contproc
+    (lambda (save-cont)
+      (lambda (vals senv cont econt)
+        (let* ((store (cdr senv))
+               (aw (an-answer (car vals)
+                              store)))
+          (apply-cont save-cont econt
+                      aw)))))
   (define procedure
     (lambda (vars body env)
       #| (proc-env (extract-freevar-env vars body env (empty-env))) |#

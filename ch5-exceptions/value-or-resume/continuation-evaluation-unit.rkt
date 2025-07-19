@@ -99,5 +99,32 @@
                                     econt
                                     (make-answer
                                      (cont-val (get-nextcont cont)))))
+          (letcc-exp (ident exp1)
+                     (value-of/k exp1
+                                 (extend-senv ident
+                                              (cont-val cont)
+                                              senv)
+                                 cont
+                                 econt))
+          (letcc*-exp (ident exp1)
+                      (value-of/k exp1
+                                  (extend-senv ident
+                                               (proc-val (contproc cont))
+                                               senv)
+                                  cont
+                                  econt))
+          (throw-exp (exp1 exp2)
+                     (value-of/k exp1
+                                 senv
+                                 (throw-cont exp2 (car senv) cont)
+                                 econt))
           ))))
+  (define contproc
+    (lambda (save-cont)
+      (lambda (vals senv cont econt)
+        (let* ((store (cdr senv))
+               (aw (an-answer (car vals)
+                              store)))
+          (apply-cont save-cont econt
+                      aw)))))
   )

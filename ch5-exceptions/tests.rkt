@@ -125,3 +125,18 @@
                     end
               in try (run)
                  catch (x) x")
+(define exception-test7
+  "let g = proc(x)
+           letcc cont
+            in (x cont)
+       h = proc(y)
+           throw 2
+           to y
+    in (+ (g h) 3)")
+(define exception-test8
+  "let g = proc(x)
+           letcc* cont
+            in (x cont)
+       h = proc(y)
+           (y 2)
+    in (+ (g h) 3)")

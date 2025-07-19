@@ -301,6 +301,21 @@
                                                   " "
                                                   exps)
                                  "endraise"))
+        (letcc-exp (ident exp1)
+                   (make-exp-str "letcc "
+                                 (tostring ident)
+                                 " in "
+                                 (exp->fmt exp1)))
+        (letcc*-exp (ident exp1)
+                    (make-exp-str "letcc* "
+                                  (tostring ident)
+                                  " in "
+                                  (exp->fmt exp1)))
+        (throw-exp (exp1 exp2)
+                   (make-exp-str "throw "
+                                 (exp->fmt exp1)
+                                 " to "
+                                 (exp->fmt exp2)))
         )))
   (define innerop->fmt
     (lambda (inner-op)

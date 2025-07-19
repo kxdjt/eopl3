@@ -22,7 +22,9 @@
    make-let-cont-by-op
    raise-cont
    raise-cont2
-   get-nextcont)
+   get-nextcont
+   throw-cont
+   throw-cont2)
   )
 
 (provide continuation^)

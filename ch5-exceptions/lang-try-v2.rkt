@@ -38,7 +38,6 @@
     ;;Expression ::= begin Expression {; Expression}* end
     ;;               begin-exp (exp1 exps2)
     (expression ( "begin" expression (arbno ";" expression) "end") begin-exp)
-    (expression ( "curcont") cur-cont-exp)
     (expression (inner-operator) innerop-exp)
     (inner-operator (none-op) none-op)
     (inner-operator (binary-op) binary-op)
@@ -52,6 +51,13 @@
     (expression ("try" expression "catch" "(" identifier ")" expression) try-exp)
     ;;Expression ::= raise Expression
     (expression ("raise" expression (arbno expression) "endraise" ) raise-exp)
+    (expression ( "curcont") cur-cont-exp)
+    ;;Expression ::= letcc identifier in expression
+    (expression ( "letcc" identifier "in" expression) letcc-exp)
+    ;;Expression ::= letcc* identifier in expression
+    (expression ( "letcc*" identifier "in" expression) letcc*-exp)
+    ;;Expression ::= throw expression to expression
+    (expression ( "throw" expression "to" expression) throw-exp)
     ))
 
 (sllgen:make-define-datatypes scanner-spec-let grammar-let)

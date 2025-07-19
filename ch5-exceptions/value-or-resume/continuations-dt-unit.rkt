@@ -93,6 +93,12 @@
     (try-cont
      (econt continuation?)
      (cont continuation?))
+    (throw-cont
+     (exp2 expression?)
+     (env environment?)
+     (cont continuation?))
+    (throw-cont2
+     (val expval?))
     (empty-econt)
     )
 
@@ -285,6 +291,16 @@
                                                                 (cons-val (answer->eval aw)
                                                                           (empty-list))))
                                             (answer->store aw))))
+        (throw-cont (exp2 env cont)
+                    (value-of/k exp2
+                                (cons env (answer->store aw))
+                                (throw-cont2 (answer->eval aw))
+                                econt))
+        (throw-cont2 (eval)
+                     (apply-cont (expval->cont (answer->eval aw))
+                                 econt
+                                 (an-answer eval
+                                            (answer->store aw))))
         (end-cont ()
                   (printf "End of Computation. \n")
                   (answer->eval aw))
@@ -311,5 +327,7 @@
         (try-cont (econt cont) cont)
         (raise-cont (_ env cont) cont)
         (raise-cont2 (val cont) cont)
+        (throw-cont (exp2 env cont) cont)
+        (throw-cont2 (val) cont)
         (empty-econt () cont))))
   )
