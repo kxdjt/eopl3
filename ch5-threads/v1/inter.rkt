@@ -8,6 +8,7 @@
          "continuation-interface-sig.rkt"
          "continuations-sig.rkt"
          "scheduler-unit.rkt"
+         "mutex-unit.rkt"
          "../data-structures-unit.rkt"
          "../operator-functions-unit.rkt"
          "../senv-unit.rkt"
@@ -19,6 +20,7 @@
   (link value-of/k-imp@
         apply-procedure@
         scheduler@
+        mutex@
         continuation-dt@
         proc-def@
         data-structures@
@@ -47,7 +49,7 @@
   (lambda (pgm)
     (cases program pgm
       (a-program (exp1)
-                 (initialize-scheduler! 2)
+                 (initialize-scheduler! 1)
                  (value-of/k exp1
                              (init-senv)
                              (end-main-thread-cont))))))

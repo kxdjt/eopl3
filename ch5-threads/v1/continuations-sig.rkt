@@ -17,7 +17,9 @@
    set-cont
    make-let-cont-by-op
    spawn-cont
-   end-main-thread-cont)
+   end-main-thread-cont
+   wait-cont
+   signal-cont)
   )
 
 (provide continuation^)

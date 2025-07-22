@@ -10,12 +10,13 @@
 (require "../store-unit.rkt")
 (require "continuations-sig.rkt")
 (require "continuation-interface-sig.rkt")
+(require "mutex-unit.rkt")
 
 #| (provide value-of/k) |#
 (provide (all-defined-out))
 
 (define-unit value-of/k-imp@
-  (import data-structures^ operator-fun^ senv^ store^ continuation^)
+  (import data-structures^ operator-fun^ senv^ store^ continuation^ mutex^)
   (export cont-valueof^)
 
   ;; Exp * Env * Cont -> Bounce
@@ -77,8 +78,8 @@
                                  senv
                                  (begin-cont exps2 env cont)))
           (set-exp (ident exp1)
-                   #| (printf "set ident:~s ref:~s exp1:~s\n" ident |#
-                   #|         (apply-env env ident) exp1) |#
+                   (printf "set ident:~s ref:~s exp1:~s\n" ident
+                           (apply-env env ident) exp1)
                    (value-of/k exp1
                                senv
                                (set-cont (apply-env env ident) cont)))
@@ -86,5 +87,17 @@
                      (value-of/k exp1
                                  senv
                                  (spawn-cont (car senv) cont)))
+          (mutex-exp ()
+                     (apply-cont cont
+                                 (new-mutex (cdr senv))))
+          (wait-exp (exp1)
+                    (value-of/k exp1
+                                senv
+                                (wait-cont cont)))
+          (signal-exp (exp1)
+                      (value-of/k exp1
+                                  senv
+                                  (signal-cont cont)))
+
           ))))
   )

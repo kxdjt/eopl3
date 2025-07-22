@@ -23,11 +23,13 @@
    proc-val
    innerop-val
    bool-val
+   mutex-val
    expval->bool
    expval->num
    expval->list
    expval->proc
    expval->innerop
+   expval->mutex
    expval->isinnerop?
    expval->isproc?
    explist?
@@ -55,6 +57,8 @@
      (proc proc?))
     (innerop-val
      (innerop inner-operator?))
+    (mutex-val
+     (ref number?))
     )
   (define bool-val
     (lambda (boolean)
@@ -93,6 +97,11 @@
       (cases expval val
         (innerop-val (innerop) innerop)
         (else expval-extractor-error 'innerop val))))
+  (define expval->mutex
+    (lambda (val)
+      (cases expval val
+        (mutex-val (ref) ref)
+        (else expval-extractor-error 'mutex val))))
   (define expval->isinnerop?
     (lambda (val)
       (cases expval val
@@ -275,6 +284,14 @@
         (spawn-exp (exp1)
                    (make-exp-str "spawn "
                                  (exp->fmt exp1)))
+        (mutex-exp ()
+                   (make-exp-str "mutex"))
+        (signal-exp (exp1)
+                    (make-exp-str "signal "
+                                  (exp->fmt exp1)))
+        (wait-exp (exp1)
+                  (make-exp-str "wait "
+                                (exp->fmt exp1)))
         )))
   (define innerop->fmt
     (lambda (inner-op)

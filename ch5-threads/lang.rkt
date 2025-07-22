@@ -7,7 +7,7 @@
 (define scanner-spec-let
   '((white-sp (whitespace) skip)
     (number ((or digit (concat "-" digit)) (arbno digit)) number)
-    (identifier (letter (arbno (or letter digit "?" "-"))) symbol)
+    (identifier (letter (arbno (or letter digit "?" "-" "_"))) symbol)
     (binary-op ((or "+" "-" "*" "/" "equal?" "greater?" "less?" "cons")) string)
     (unary-op ((or "minus" "zero?" "car" "cdr" "null?" "print")) string)
     (none-op ((or "emptylist")) string)
@@ -49,6 +49,12 @@
     ;;------------Thread--------------------------
     ;;Expressioin ::= spawn expression
     (expression ("spawn" expression) spawn-exp)
+    ;;Expression ::= mutex identifier
+    (expression ("mutex") mutex-exp)
+    ;;Expression ::= wait identifier
+    (expression ("wait" expression) wait-exp)
+    ;;Expression ::= signal identifier
+    (expression ("signal" expression) signal-exp)
     ))
 
 (sllgen:make-define-datatypes scanner-spec-let grammar-let)
