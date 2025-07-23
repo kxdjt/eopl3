@@ -10,7 +10,7 @@
          "scheduler-unit.rkt"
          "mutex-unit.rkt"
          "../data-structures-unit.rkt"
-         "../operator-functions-unit.rkt"
+         "operator-functions-unit.rkt"
          "../senv-unit.rkt"
          "../store-unit.rkt")
 

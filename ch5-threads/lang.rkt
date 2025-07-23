@@ -9,8 +9,8 @@
     (number ((or digit (concat "-" digit)) (arbno digit)) number)
     (identifier (letter (arbno (or letter digit "?" "-" "_"))) symbol)
     (binary-op ((or "+" "-" "*" "/" "equal?" "greater?" "less?" "cons")) string)
-    (unary-op ((or "minus" "zero?" "car" "cdr" "null?" "print")) string)
-    (none-op ((or "emptylist")) string)
+    (unary-op ((or "minus" "zero?" "car" "cdr" "null?" "print" "wait" "signal" "spawn")) string)
+    (none-op ((or "emptylist" "mutex")) string)
     (any-op ((or "list")) string)
     (let-op ((or "let" "let*")) string)
     (proc-op ((or "proc" "traceproc" "dyproc")) string)
@@ -47,14 +47,8 @@
     ;;Expression ::= set identifier = expression
     (expression ("set" identifier "=" expression) set-exp)
     ;;------------Thread--------------------------
-    ;;Expressioin ::= spawn expression
-    (expression ("spawn" expression) spawn-exp)
-    ;;Expression ::= mutex identifier
-    (expression ("mutex") mutex-exp)
-    ;;Expression ::= wait identifier
-    (expression ("wait" expression) wait-exp)
-    ;;Expression ::= signal identifier
-    (expression ("signal" expression) signal-exp)
+    #| ;;Expression ::= yield |#
+    #| (expression ("yield") yield-exp) |#
     ))
 
 (sllgen:make-define-datatypes scanner-spec-let grammar-let)

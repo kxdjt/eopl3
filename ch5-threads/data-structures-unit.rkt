@@ -281,17 +281,6 @@
                                (exp->fmt exp1)))
         (innerop-exp (inner-op)
                      (innerop->fmt inner-op))
-        (spawn-exp (exp1)
-                   (make-exp-str "spawn "
-                                 (exp->fmt exp1)))
-        (mutex-exp ()
-                   (make-exp-str "mutex"))
-        (signal-exp (exp1)
-                    (make-exp-str "signal "
-                                  (exp->fmt exp1)))
-        (wait-exp (exp1)
-                  (make-exp-str "wait "
-                                (exp->fmt exp1)))
         )))
   (define innerop->fmt
     (lambda (inner-op)

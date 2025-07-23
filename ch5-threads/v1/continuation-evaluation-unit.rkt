@@ -5,7 +5,7 @@
 
 (require "../../common/enironment.rkt")
 (require "../data-structures-unit.rkt")
-(require "../operator-functions-unit.rkt")
+(require "operator-functions-unit.rkt")
 (require "../senv-unit.rkt")
 (require "../store-unit.rkt")
 (require "continuations-sig.rkt")
@@ -83,21 +83,6 @@
                    (value-of/k exp1
                                senv
                                (set-cont (apply-env env ident) cont)))
-          (spawn-exp (exp1)
-                     (value-of/k exp1
-                                 senv
-                                 (spawn-cont (car senv) cont)))
-          (mutex-exp ()
-                     (apply-cont cont
-                                 (new-mutex (cdr senv))))
-          (wait-exp (exp1)
-                    (value-of/k exp1
-                                senv
-                                (wait-cont cont)))
-          (signal-exp (exp1)
-                      (value-of/k exp1
-                                  senv
-                                  (signal-cont cont)))
 
           ))))
   )

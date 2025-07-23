@@ -27,7 +27,7 @@
     (lambda (thread)
       (set! the-ready-queue
             (enqueue the-ready-queue thread))
-      (debug-notice "place-orq" "the-ready-queue:~s\n" the-ready-queue)))
+      (debug-trace "place-orq" "the-ready-queue:~s\n" the-ready-queue)))
 
   (define run-next-thread
     (lambda (store)
@@ -37,7 +37,7 @@
                    (lambda(n-thread rest-p)
                      (set! the-ready-queue rest-p)
                      (set! the-time-remaining the-max-time-slice)
-                     (debug-notice "run-nt" "n-thread:~s the-ready-queue:~s\n" n-thread the-ready-queue)
+                     (debug-trace "run-nt" "n-thread:~s the-ready-queue:~s\n" n-thread the-ready-queue)
                      (n-thread store))))))
   (define set-final-answer!
     (lambda (aw)

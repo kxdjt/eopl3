@@ -1,7 +1,10 @@
 #lang racket
 
-(require "data-structures-unit.rkt")
-(require "procedure-sig.rkt")
+(require "../data-structures-unit.rkt")
+(require "../procedure-sig.rkt")
+(require "../store-unit.rkt")
+(require "mutex-unit.rkt")
+(require "continuations-sig.rkt")
 
 (define-signature operator-fun^
   (binary-operator
@@ -15,7 +18,7 @@
 
 
 (define-unit operator-fun@
-  (import data-structures^ proc-def^)
+  (import data-structures^ proc-def^ store^ mutex^ continuation^)
   (export operator-fun^)
 
   ;; Implatement operator function
@@ -72,7 +75,15 @@
           (list-val
            (cons-val (car evals)
                      (expval->list (list-op (cdr evals))))))))
+  (define mutex-op
+    (lambda (store)
+      (new-mutex store)))
   ;; Register operator function
+  (define make-default-none-fun
+    (lambda (fun)
+      (lambda (store)
+        (an-answer (fun)
+                   store))))
   (define make-fun-table
     (lambda lst
       (lambda (op)
@@ -99,7 +110,8 @@
      ))
   (define none-operator
     (make-fun-table
-     (cons "emptylist" emptylist-op)
+     (cons "emptylist" (make-default-none-fun emptylist-op))
+     (cons "mutex" mutex-op)
      ))
   (define any-operator
     (make-fun-table

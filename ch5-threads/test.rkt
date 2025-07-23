@@ -42,22 +42,22 @@
                       proc (dummy)
                         set x = (- x (- 2 (+ 1 2)))
         in begin
-            spawn(incr_x 100);
-            spawn(incr_x 200);
-            spawn(incr_x 300)
+            (spawn(incr_x 100));
+            (spawn(incr_x 200));
+            (spawn(incr_x 300))
            end")
 (define safe-counter-test
   "let x = 0
-    in let mut = mutex
+    in let mut = (mutex)
         in let incr_x = proc (id)
                           proc (dummy)
                             begin
-                              wait mut;
+                              (wait mut);
                               set x = (- x (- 2 (+ 1 2)));
-                              signal mut
+                              (signal mut)
                             end
           in begin
-              spawn(incr_x 100);
-              spawn(incr_x 200);
-              spawn(incr_x 300)
+              (spawn(incr_x 100));
+              (spawn(incr_x 200));
+              (spawn(incr_x 300))
              end")

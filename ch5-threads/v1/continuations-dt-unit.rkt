@@ -7,7 +7,7 @@
 (require "../procedure-sig.rkt")
 (require "../store-unit.rkt")
 (require "../senv-unit.rkt")
-(require "../operator-functions-unit.rkt")
+(require "operator-functions-unit.rkt")
 (require "continuations-sig.rkt")
 (require "continuation-interface-sig.rkt")
 (require "scheduler-sig.rkt")
@@ -97,9 +97,26 @@
       (if (equal? op "let*")
           (let*-cont vars exps body cont env)
           (let-cont vars exps body cont env env))))
+  (define make-unary-cont-table
+    (lambda (default . lst)
+      (lambda (op . vars)
+        (let ((found (assoc op lst))
+              (get-vars (lambda(r)
+                          (list-tail vars (- (length vars) r)))))
+          (printf "unary-op-fun op:~s found:~s vars:~s\n" op found vars)
+          (if (not found)
+              (apply default op (get-vars 1))
+              (apply (caddr found) (get-vars (cadr found))))))))
+  (define make-unary-cont-by-op
+    (make-unary-cont-table
+     unary-op-cont
+     (list "wait" 1 wait-cont)
+     (list "signal" 1 signal-cont)
+     (list "spawn" 2 spawn-cont)
+     ))
   (define apply-cont
     (lambda (cont aw)
-      (debug-notice "apply-cont" "cont:~s aw:~s\n" cont aw)
+      (debug-trace "apply-cont" "cont:~s aw:~s\n" cont aw)
       (if (time-expired?)
           (begin
             (place-on-ready-queue!
@@ -161,7 +178,7 @@
                               (cases inner-operator (expval->innerop eval)
                                 (none-op (op)
                                          (apply-cont cont
-                                                     (make-answer ((none-operator op)))))
+                                                     ((none-operator op) store)))
                                 (binary-op (op)
                                            (value-of/k (car rands)
                                                        senv
@@ -169,7 +186,7 @@
                                 (unary-op (op)
                                           (value-of/k (car rands)
                                                       senv
-                                                      (unary-op-cont op cont)))
+                                                      (make-unary-cont-by-op op (car senv) cont)))
                                 (any-op (op)
                                         (if (null? rands)
                                             (apply-cont cont
