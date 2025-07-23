@@ -99,7 +99,7 @@
           (let-cont vars exps body cont env env))))
   (define apply-cont
     (lambda (cont aw)
-      (debug-trace "apply-cont" "cont:~s aw:~s\n" cont aw)
+      (debug-notice "apply-cont" "cont:~s aw:~s\n" cont aw)
       (if (time-expired?)
           (begin
             (place-on-ready-queue!
@@ -237,7 +237,7 @@
               (set-cont (ref cont)
                         (let* ((eval (answer->eval aw))
                                (store (answer->store aw)))
-                          (printf "set-cont ref:~s eval:~s\n" ref eval)
+                          (debug-notice "set-cont" "ref:~s eval:~s\n" ref eval)
                           (apply-cont cont
                                       (an-answer eval
                                                  (store->setref

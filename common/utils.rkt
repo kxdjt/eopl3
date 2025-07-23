@@ -1,9 +1,37 @@
 #lang racket
 
-(provide list-member? remove-by-idx debug-fun printf-hlmsg debug-info debug-trace)
+(provide list-member? remove-by-idx debug-fun printf-hlmsg debug-info debug-trace debug-notice)
 
 (define DEBUG #f)
-(define TRACE #t)
+(define TRACE #f)
+
+(define CUR-LEVEL 3)
+(define NOTICE-LEVEL 3)
+(define TRACE-LEVEL 2)
+(define INFO-LEVEL 1)
+
+(define greater-than-cur-level
+  (lambda (level)
+    (>= level CUR-LEVEL)))
+(define equal-with-cur-level
+  (lambda (level)
+    (= level CUR-LEVEL)))
+
+(define check-fun equal-with-cur-level)
+
+(define make-debug
+  (lambda (check)
+    (lambda (level)
+      (lambda (key form . vars)
+        (if (check level)
+            (apply printf-hlmsg key form vars)
+            'none)))))
+(define debug-trace
+  ((make-debug check-fun) TRACE-LEVEL))
+(define debug-info
+  ((make-debug check-fun) INFO-LEVEL))
+(define debug-notice
+  ((make-debug check-fun) NOTICE-LEVEL))
 
 (define remove-by-idx
   (lambda (lst idx)
@@ -53,16 +81,3 @@
     (apply printf
            (string-append "\x1b[34m" key "\x1b[0m" ": " form)
            vars)))
-(define debug-info
-  (lambda (key form . vars)
-    (if DEBUG
-        (apply printf-hlmsg key form vars)
-        'none)))
-(define make-debug-fun
-  (lambda (sw)
-    (lambda (key form . vars)
-      (if sw
-          (apply printf-hlmsg key form vars)
-          'none))))
-(define debug-trace
-  (make-debug-fun TRACE))

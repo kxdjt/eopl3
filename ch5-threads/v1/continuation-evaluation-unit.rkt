@@ -78,8 +78,8 @@
                                  senv
                                  (begin-cont exps2 env cont)))
           (set-exp (ident exp1)
-                   (printf "set ident:~s ref:~s exp1:~s\n" ident
-                           (apply-env env ident) exp1)
+                   (debug-notice "set-exp" "ident:~s ref:~s exp1:~s\n" ident
+                                 (apply-env env ident) exp1)
                    (value-of/k exp1
                                senv
                                (set-cont (apply-env env ident) cont)))
