@@ -48,7 +48,7 @@
                                     (innerop-val inner-op))))
           (if-exp (exp1 exp2 exp3)
                   (value-of/k exp1 senv
-                              (if-cont exp2 exp3 env cont)))
+                              (if-cont cont exp2 exp3 env)))
           (let-exp (op vars exps body)
                    (if (null? exps)
                        (value-of/k body senv cont)
@@ -64,7 +64,7 @@
                         (eopl:error 'cond "None of the tests succeeds!")
                         (value-of/k (car exps1)
                                     senv
-                                    (cond-cont (cdr exps1) exps2 env cont))))
+                                    (cond-cont cont (cdr exps1) exps2 env))))
           (proc-exp (op vars body)
                     (apply-cont cont
                                 (make-answer
@@ -72,17 +72,17 @@
           (call-exp (exp1 rands)
                     (value-of/k exp1
                                 senv
-                                (call-cont rands env cont)))
+                                (call-cont cont rands env)))
           (begin-exp (exp1 exps2)
                      (value-of/k exp1
                                  senv
-                                 (begin-cont exps2 env cont)))
+                                 (begin-cont cont exps2 env)))
           (set-exp (ident exp1)
                    (debug-notice "set-exp" "ident:~s ref:~s exp1:~s\n" ident
                                  (apply-env env ident) exp1)
                    (value-of/k exp1
                                senv
-                               (set-cont (apply-env env ident) cont)))
+                               (set-cont cont (apply-env env ident))))
 
           ))))
   )

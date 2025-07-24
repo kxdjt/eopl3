@@ -8,11 +8,6 @@
    let*-cont
    cond-cont
    call-cont
-   binary-op-cont1
-   binary-op-cont2
-   unary-op-cont
-   any-op-cont
-   proc-cont
    begin-cont
    set-cont
    make-let-cont-by-op

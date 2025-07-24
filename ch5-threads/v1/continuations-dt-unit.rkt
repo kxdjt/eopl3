@@ -24,10 +24,10 @@
   (define-datatype continuation continuation?
     (end-cont)
     (if-cont
+     (cont continuation?)
      (exp2 expression?)
      (exp3 expression?)
-     (env environment?)
-     (cont continuation?))
+     (env environment?))
     (let-cont
      (vars (list-of symbol?))
      (exps (list-of expression?))
@@ -42,14 +42,14 @@
      (cont continuation?)
      (env environment?))
     (cond-cont
+     (cont continuation?)
      (exps1 (list-of expression?))
      (exps2 (list-of expression?))
-     (env environment?)
-     (cont continuation?))
+     (env environment?))
     (call-cont
+     (cont continuation?)
      (rands (list-of expression?))
-     (env environment?)
-     (cont continuation?))
+     (env environment?))
     (binary-op-cont1
      (op string?)
      (rands (list-of expression?))
@@ -75,12 +75,12 @@
      (cont continuation?)
      (vals (list-of expval?)))
     (begin-cont
+      (cont continuation?)
       (exps2 (list-of expression?))
-      (env environment?)
-      (cont continuation?))
+      (env environment?))
     (set-cont
-     (ref number?)
-     (cont continuation?))
+     (cont continuation?)
+     (ref number?))
     (spawn-cont
      (env environment?)
      (cont continuation?))
@@ -128,7 +128,7 @@
             (debug-notice "time-remain" "~s\n" (get-time-remaining))
             (decrement-timer!)
             (cases continuation cont
-              (if-cont (exp2 exp3 env cont)
+              (if-cont (cont exp2 exp3 env)
                        (let* ((eval (answer->eval aw))
                               (store (answer->store aw))
                               (senv (cons env store)))
@@ -157,7 +157,7 @@
                                           (cons ori-env (cdr new-senv))
                                           (let-cont (cdr vars) (cdr exps) body cont ori-env
                                                     (car new-senv))))))
-              (cond-cont (exps1 exps2 env cont)
+              (cond-cont (cont exps1 exps2 env)
                          (let* ((eval (answer->eval aw))
                                 (store (answer->store aw))
                                 (senv (cons env store)))
@@ -167,8 +167,8 @@
                                    (eopl:error 'cond "None of the tests succeeds!")
                                    (value-of/k (car exps1)
                                                senv
-                                               (cond-cont (cdr exps1) (cdr exps2) env cont))))))
-              (call-cont (rands env cont)
+                                               (cond-cont cont (cdr exps1) (cdr exps2) env))))))
+              (call-cont (cont rands env)
                          (let* ((eval (answer->eval aw))
                                 (store (answer->store aw))
                                 (senv (cons env store))
@@ -245,13 +245,13 @@
                                (value-of/k (car rands)
                                            senv
                                            (proc-cont proc (cdr rands) env cont new-vals)))))
-              (begin-cont (exps2 env cont)
+              (begin-cont (cont exps2 env)
                           (if (null? exps2)
                               (apply-cont cont aw)
                               (value-of/k (car exps2)
                                           (cons env (answer->store aw))
-                                          (begin-cont (cdr exps2) env cont))))
-              (set-cont (ref cont)
+                                          (begin-cont cont (cdr exps2) env))))
+              (set-cont (cont ref)
                         (let* ((eval (answer->eval aw))
                                (store (answer->store aw)))
                           (debug-notice "set-cont" "ref:~s eval:~s\n" ref eval)

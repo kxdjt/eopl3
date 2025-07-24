@@ -1,6 +1,6 @@
 #lang racket
 
-(provide list-member? remove-by-idx debug-fun printf-hlmsg debug-info debug-trace debug-notice)
+(provide list-member? remove-by-idx debug-fun printf-hlmsg debug-info debug-trace debug-notice list-head)
 
 (define DEBUG #f)
 (define TRACE #f)
@@ -17,7 +17,7 @@
   (lambda (level)
     (= level CUR-LEVEL)))
 
-(define check-fun equal-with-cur-level)
+(define check-fun greater-than-cur-level)
 
 (define make-debug
   (lambda (check)
@@ -40,6 +40,12 @@
         (cons (car lst)
               (remove-by-idx (cdr lst) (- idx 1))))))
 
+(define list-head
+  (lambda (lst num)
+    (if (zero? num)
+        '()
+        (cons (car lst)
+              (list-head (cdr lst) (- num 1))))))
 (define list-of
   (lambda (pred)
     (lambda (var)

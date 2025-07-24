@@ -80,12 +80,12 @@
     (lambda (store)
       (new-mutex store)))
   (define yield-op
-    (lambda (store cond)
+    (lambda (store cont)
       (let ((time-remain (get-time-remaining)))
         (place-on-ready-queue!
          (lambda (store)
            (set-time-remaining! time-remain)
-           (apply-cont cond (an-answer (num-val 99)
+           (apply-cont cont (an-answer (num-val 99)
                                        store))))
         (run-next-thread store))))
   ;; Register operator function

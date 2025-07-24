@@ -15,14 +15,13 @@
 (define thread-test1
   "let buffer= 0
     in let producer= proc(n)
-                      letrec
-                          wait(k)= if (zero? k)
+                  letrec mywait(k)= if (zero? k)
                                    then set buffer=n
                                    else begin
                                           (print (- k -200));
-                                          (wait (- k 1))
+                                          (mywait (- k 1))
                                         end
-                      in (wait  5)
+                      in (mywait  5)
           in let consumer=proc(d)
                 letrec busywait(k)= if (zero? buffer)
                                     then begin
@@ -32,7 +31,7 @@
                                     else buffer
                         in (busywait 0)
               in begin
-                  spawn proc(d)(producer 44);
+                  (spawn proc(d)(producer 44));
                   (print 300);
                   (consumer 86)
                 end")
@@ -76,3 +75,8 @@
           (print x)
          end")
 
+(define letrec-test
+  "letrec p(x) = if (less? x 0)
+                 then x
+                 else (p (- x 1))
+     in (p 1)")
