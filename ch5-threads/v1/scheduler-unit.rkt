@@ -49,4 +49,10 @@
     (lambda()
       (set! the-time-remaining
             (- the-time-remaining 1))))
+  (define get-time-remaining
+    (lambda()
+      the-time-remaining))
+  (define set-time-remaining!
+    (lambda(t)
+      (set! the-time-remaining t)))
   )

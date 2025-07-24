@@ -49,7 +49,7 @@
   (lambda (pgm)
     (cases program pgm
       (a-program (exp1)
-                 (initialize-scheduler! 1)
+                 (initialize-scheduler! 10)
                  (value-of/k exp1
                              (init-senv)
                              (end-main-thread-cont))))))

@@ -10,7 +10,7 @@
     (identifier (letter (arbno (or letter digit "?" "-" "_"))) symbol)
     (binary-op ((or "+" "-" "*" "/" "equal?" "greater?" "less?" "cons")) string)
     (unary-op ((or "minus" "zero?" "car" "cdr" "null?" "print" "wait" "signal" "spawn")) string)
-    (none-op ((or "emptylist" "mutex")) string)
+    (none-op ((or "emptylist" "mutex" "yield")) string)
     (any-op ((or "list")) string)
     (let-op ((or "let" "let*")) string)
     (proc-op ((or "proc" "traceproc" "dyproc")) string)

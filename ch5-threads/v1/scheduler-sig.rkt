@@ -6,7 +6,9 @@
    run-next-thread
    set-final-answer!
    time-expired?
-   decrement-timer!))
+   decrement-timer!
+   set-time-remaining!
+   get-time-remaining))
 
 (provide scheduler^)
 

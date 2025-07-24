@@ -103,7 +103,7 @@
         (let ((found (assoc op lst))
               (get-vars (lambda(r)
                           (list-tail vars (- (length vars) r)))))
-          (printf "unary-op-fun op:~s found:~s vars:~s\n" op found vars)
+          #| (printf "unary-op-fun op:~s found:~s vars:~s\n" op found vars) |#
           (if (not found)
               (apply default op (get-vars 1))
               (apply (caddr found) (get-vars (cadr found))))))))
@@ -125,6 +125,7 @@
                                            store))))
             (run-next-thread (answer->store aw)))
           (begin
+            (debug-notice "time-remain" "~s\n" (get-time-remaining))
             (decrement-timer!)
             (cases continuation cont
               (if-cont (exp2 exp3 env cont)
@@ -177,8 +178,7 @@
                              ((expval->isinnerop? eval)
                               (cases inner-operator (expval->innerop eval)
                                 (none-op (op)
-                                         (apply-cont cont
-                                                     ((none-operator op) store)))
+                                         ((none-operator op) store cont))
                                 (binary-op (op)
                                            (value-of/k (car rands)
                                                        senv

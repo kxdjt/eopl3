@@ -61,3 +61,18 @@
               (spawn(incr_x 200));
               (spawn(incr_x 300))
              end")
+(define yield-test
+  "let x = 0
+   in let incr_x = proc()
+                    begin
+                      (print x);
+                      (yield);
+                      set x = (- x -1);
+                      (print x)
+                    end
+      in begin
+          (spawn incr_x);
+          (yield);
+          (print x)
+         end")
+

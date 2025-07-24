@@ -5,6 +5,7 @@
 (require "../store-unit.rkt")
 (require "mutex-unit.rkt")
 (require "continuations-sig.rkt")
+(require "scheduler-unit.rkt")
 
 (define-signature operator-fun^
   (binary-operator
@@ -18,7 +19,7 @@
 
 
 (define-unit operator-fun@
-  (import data-structures^ proc-def^ store^ mutex^ continuation^)
+  (import data-structures^ proc-def^ store^ mutex^ continuation^ scheduler^)
   (export operator-fun^)
 
   ;; Implatement operator function
@@ -78,11 +79,24 @@
   (define mutex-op
     (lambda (store)
       (new-mutex store)))
+  (define yield-op
+    (lambda (store cond)
+      (let ((time-remain (get-time-remaining)))
+        (place-on-ready-queue!
+         (lambda (store)
+           (set-time-remaining! time-remain)
+           (apply-cont cond (an-answer (num-val 99)
+                                       store))))
+        (run-next-thread store))))
   ;; Register operator function
-  (define make-default-none-fun
-    (lambda (fun)
+  (define apply-cont-fun
+    (lambda (store-fun)
+      (lambda (store cont)
+        (apply-cont cont (store-fun store)))))
+  (define make-answer-fun
+    (lambda (store-fun)
       (lambda (store)
-        (an-answer (fun)
+        (an-answer (store-fun)
                    store))))
   (define make-fun-table
     (lambda lst
@@ -110,8 +124,9 @@
      ))
   (define none-operator
     (make-fun-table
-     (cons "emptylist" (make-default-none-fun emptylist-op))
-     (cons "mutex" mutex-op)
+     (cons "emptylist" (apply-cont-fun (make-answer-fun emptylist-op)))
+     (cons "mutex" (apply-cont-fun mutex-op))
+     (cons "yield" yield-op)
      ))
   (define any-operator
     (make-fun-table
