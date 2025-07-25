@@ -1,6 +1,6 @@
 #lang racket
 
-(provide list-member? remove-by-idx debug-fun printf-hlmsg debug-info debug-trace debug-notice list-head)
+(provide list-member? remove-by-idx debug-fun printf-hlmsg debug-info debug-trace debug-notice list-head make-debug-fun)
 
 (define DEBUG #f)
 (define TRACE #f)
@@ -17,8 +17,6 @@
   (lambda (level)
     (= level CUR-LEVEL)))
 
-(define check-fun greater-than-cur-level)
-
 (define make-debug
   (lambda (check)
     (lambda (level)
@@ -26,12 +24,19 @@
         (if (check level)
             (apply printf-hlmsg key form vars)
             'none)))))
+(define make-greater-debug
+  (make-debug greater-than-cur-level))
+(define make-equal-debug
+  (make-debug equal-with-cur-level))
+
+(define make-debug-fun make-greater-debug)
+
 (define debug-trace
-  ((make-debug check-fun) TRACE-LEVEL))
+  (make-debug-fun TRACE-LEVEL))
 (define debug-info
-  ((make-debug check-fun) INFO-LEVEL))
+  (make-debug-fun INFO-LEVEL))
 (define debug-notice
-  ((make-debug check-fun) NOTICE-LEVEL))
+  (make-debug-fun NOTICE-LEVEL))
 
 (define remove-by-idx
   (lambda (lst idx)

@@ -80,3 +80,46 @@
                  then x
                  else (p (- x 1))
      in (p 1)")
+(define safe-counter-test2
+  "let x = 0
+    in let mut = (mutex)
+           a-mut = (mutex)
+        in let incr_x = proc (id)
+                          proc (dummy)
+                            begin
+                              (wait mut);
+                              set x = (- x (- 2 (+ 1 2)));
+                              if (equal? x 3) then (signal a-mut) else (print x);
+                              (signal mut)
+                            end
+          in begin
+              (wait a-mut);
+              (spawn(incr_x 100));
+              (spawn(incr_x 200));
+              (spawn(incr_x 300));
+              (wait a-mut);
+              x
+             end")
+(define thread-test2
+  "let buffer= 0
+       pr-mut = (mutex)
+    in let producer= proc(n)
+                  letrec mywait(k)= if (zero? k)
+                                   then begin set buffer=n;(signal pr-mut) end
+                                   else begin
+                                          (print (- k -200));
+                                          (mywait (- k 1))
+                                        end
+                      in (mywait  5)
+          in let consumer=proc(d)
+                            begin
+                              (wait pr-mut);
+                              (print d);
+                              buffer
+                            end
+              in begin
+                  (wait pr-mut);
+                  (spawn proc(d)(producer 44));
+                  (print 300);
+                  (consumer 86)
+                end")

@@ -15,6 +15,8 @@
 
 (provide continuation-dt@)
 
+(define debug-timer
+  (make-debug-fun 2))
 
 (define-unit continuation-dt@
   (import data-structures^ proc-def^ store^ senv^ operator-fun^ cont-valueof^ apply-procedure^ scheduler^ mutex^)
@@ -125,7 +127,7 @@
                                            store))))
             (run-next-thread (answer->store aw)))
           (begin
-            (debug-notice "time-remain" "~s\n" (get-time-remaining))
+            (debug-timer "time-remain" "~s\n" (get-time-remaining))
             (decrement-timer!)
             (cases continuation cont
               (if-cont (cont exp2 exp3 env)
