@@ -1,11 +1,14 @@
 #lang racket
 
-(provide list-member? remove-by-idx debug-fun printf-hlmsg debug-info debug-trace debug-notice list-head make-debug-fun)
+(provide list-member? remove-by-idx debug-fun printf-hlmsg
+         debug-info debug-trace debug-notice list-head
+         make-debug-fun debug-thread)
 
 (define DEBUG #f)
 (define TRACE #f)
 
-(define CUR-LEVEL 3)
+(define CUR-LEVEL 5)
+(define THREAD-LEVEL 5)
 (define NOTICE-LEVEL 3)
 (define TRACE-LEVEL 2)
 (define INFO-LEVEL 1)
@@ -28,6 +31,10 @@
   (make-debug greater-than-cur-level))
 (define make-equal-debug
   (make-debug equal-with-cur-level))
+(define make-tmp-debug
+  (make-debug (lambda(level)
+                (or (equal? TRACE-LEVEL level)
+                    (equal? THREAD-LEVEL level)))))
 
 (define make-debug-fun make-greater-debug)
 
@@ -37,6 +44,8 @@
   (make-debug-fun INFO-LEVEL))
 (define debug-notice
   (make-debug-fun NOTICE-LEVEL))
+(define debug-thread
+  (make-debug-fun THREAD-LEVEL))
 
 (define remove-by-idx
   (lambda (lst idx)
@@ -69,12 +78,14 @@
         init-res
         (foldl fun (cdr lst) (fun (car lst) init-res)))))
 (define list-member?
-  (lambda (search-v lst)
-    (if (null? lst)
-        #f
-        (if (equal? search-v (car lst))
-            #t
-            (list-member? search-v (cdr lst))))))
+  (lambda (search-v lst . pred)
+    (let ((pred? (if (null? pred) equal?
+                     (car pred))))
+      (if (null? lst)
+          #f
+          (if (pred? search-v (car lst))
+              #t
+              (list-member? search-v (cdr lst)))))))
 (define forward
   (lambda (x . xs)
     x))

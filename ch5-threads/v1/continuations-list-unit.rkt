@@ -13,9 +13,13 @@
 (require "continuation-interface-sig.rkt")
 (require "scheduler-sig.rkt")
 (require "mutex-unit.rkt")
+(require "thread-unit.rkt")
 
 
 (provide continuation-list@)
+
+(define debug-timer
+  (make-debug-fun 1))
 
 #| (define make-list-cont |#
 #|   (lambda (apply-fun) |#
@@ -34,7 +38,8 @@
          cont)))))
 
 (define-unit continuation-list@
-  (import data-structures^ proc-def^ store^ senv^ operator-fun^ cont-valueof^ apply-procedure^ scheduler^ mutex^)
+  (import data-structures^ proc-def^ store^ senv^ operator-fun^
+          cont-valueof^ apply-procedure^ scheduler^ mutex^ thread^)
   (export continuation^)
 
   (define apply-cont
@@ -43,12 +48,13 @@
       (if (time-expired?)
           (begin
             (place-on-ready-queue!
-             (lambda(store)
-               (apply-cont cont (an-answer (answer->eval aw)
-                                           store))))
+             (make-thread
+              (lambda(store)
+                (apply-cont cont (an-answer (answer->eval aw)
+                                            store)))))
             (run-next-thread (answer->store aw)))
           (begin
-            (debug-notice "time-remain" "~s\n" (get-time-remaining))
+            (debug-timer "time-remain" "~s\n" (get-time-remaining))
             (decrement-timer!)
             (apply (caar cont) aw (cdr cont) (cdar cont))))))
 
@@ -63,7 +69,7 @@
         (let ((found (assoc op lst))
               (get-vars (lambda(r)
                           (list-head vars r))))
-          (printf "unary-op-fun op:~s found:~s vars:~s\n" op found vars)
+          #| (printf "unary-op-fun op:~s found:~s vars:~s\n" op found vars) |#
           (if (not found)
               (apply default (car vars) (list op))
               (apply (caddr found) (get-vars (cadr found))))))))
@@ -227,15 +233,26 @@
   (define spawn-cont
     (make-list-cont
      (lambda (aw cont env)
-       (let ((proc (expval->proc (answer->eval aw))))
+       (let* ((proc (expval->proc (answer->eval aw)))
+              (thread (new-thread
+                       (lambda(store)
+                         (apply-procedure/k proc
+                                            (list (num-val (get-cur-thread-id)))
+                                            (cons env store)
+                                            (end-subthread-cont))))))
          (place-on-ready-queue!
-          (lambda(store)
-            (apply-procedure/k proc
-                               (list (num-val 28))
-                               (cons env store)
-                               (end-subthread-cont))))
-         (apply-cont cont (an-answer (num-val 73)
+          thread)
+         (apply-cont cont (an-answer (num-val (get-thread-id thread))
                                      (answer->store aw)))))))
+  (define kill-cont
+    (make-list-cont
+     (lambda(aw cont)
+       (let ((th-id (expval->num (answer->eval aw))))
+         (debug-thread "kill" "thid:~s cur-thid:~s\n" th-id (get-cur-thread-id))
+         (if (equal? th-id (get-cur-thread-id))
+             (run-next-thread (answer->store aw))
+             (apply-cont cont (an-answer (num-val 30)
+                                         (remove-thread th-id (answer->store aw)))))))))
   (define end-cont
     (make-list-cont
      (lambda (aw cont)
@@ -275,7 +292,7 @@
       (if (mutex->isclose? mutex store)
           (run-next-thread
            (answer->store
-            (mutex->place-on-wait-queue! mutex store cont-fun)))
+            (mutex->place-on-wait-queue! mutex store (make-thread cont-fun))))
           (cont-fun
            (answer->store
             (mutex->close mutex store))))))
@@ -295,7 +312,13 @@
      (list "wait" 1 wait-cont)
      (list "signal" 1 signal-cont)
      (list "spawn" 2 spawn-cont)
+     (list "kill" 1 kill-cont)
      ))
 
+  (define remove-thread
+    (lambda(th-id store)
+      (begin
+        (remove-thread-from-ready-queue! th-id)
+        (remove-thread-from-mutexq! th-id store))))
   )
 

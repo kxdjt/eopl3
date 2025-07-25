@@ -6,6 +6,7 @@
 (require "mutex-unit.rkt")
 (require "continuations-sig.rkt")
 (require "scheduler-unit.rkt")
+(require "thread-unit.rkt")
 
 (define-signature operator-fun^
   (binary-operator
@@ -19,7 +20,7 @@
 
 
 (define-unit operator-fun@
-  (import data-structures^ proc-def^ store^ mutex^ continuation^ scheduler^)
+  (import data-structures^ proc-def^ store^ mutex^ continuation^ scheduler^ thread^)
   (export operator-fun^)
 
   ;; Implatement operator function
@@ -83,10 +84,11 @@
     (lambda (store cont)
       (let ((time-remain (get-time-remaining)))
         (place-on-ready-queue!
-         (lambda (store)
-           (set-time-remaining! time-remain)
-           (apply-cont cont (an-answer (num-val 99)
-                                       store))))
+         (make-thread
+          (lambda (store)
+            (set-time-remaining! time-remain)
+            (apply-cont cont (an-answer (num-val 99)
+                                        store)))))
         (run-next-thread store))))
   ;; Register operator function
   (define apply-cont-fun

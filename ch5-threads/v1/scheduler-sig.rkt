@@ -3,6 +3,7 @@
 (define-signature scheduler^
   (initialize-scheduler!
    place-on-ready-queue!
+   remove-thread-from-ready-queue!
    run-next-thread
    set-final-answer!
    time-expired?

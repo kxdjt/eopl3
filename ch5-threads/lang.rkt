@@ -9,7 +9,8 @@
     (number ((or digit (concat "-" digit)) (arbno digit)) number)
     (identifier (letter (arbno (or letter digit "?" "-" "_"))) symbol)
     (binary-op ((or "+" "-" "*" "/" "equal?" "greater?" "less?" "cons")) string)
-    (unary-op ((or "minus" "zero?" "car" "cdr" "null?" "print" "wait" "signal" "spawn")) string)
+    (unary-op ((or "minus" "zero?" "car" "cdr" "null?"
+                   "print" "wait" "signal" "spawn" "kill")) string)
     (none-op ((or "emptylist" "mutex" "yield")) string)
     (any-op ((or "list")) string)
     (let-op ((or "let" "let*")) string)

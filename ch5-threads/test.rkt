@@ -123,3 +123,38 @@
                   (print 300);
                   (consumer 86)
                 end")
+(define safe-counter-test3
+  "let* x = 0
+       a-mut = (mutex)
+       mut = (mutex)
+       th_proc = proc (id)
+                    letrec loop(n) =
+                          begin
+                            (print id);
+                            (print (+ n 1000));
+                            if (equal? n 2)
+                            then
+                              begin
+                                (wait mut);
+                                (signal a-mut);
+                                (print 9999);
+                                (loop (+ n 1))
+                              end
+                            else
+                              (loop (+ n 1))
+                            end
+                      in (loop 0)
+    in begin
+        (wait a-mut);
+        let th1 = (spawn th_proc)
+            th2 = (spawn th_proc)
+            th3 = (spawn th_proc)
+          in
+            begin
+              (wait a-mut);
+              (kill th1);
+              (kill th2);
+              (kill th3);
+              x
+            end
+        end")

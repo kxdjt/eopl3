@@ -12,14 +12,16 @@
 (require "continuation-interface-sig.rkt")
 (require "scheduler-sig.rkt")
 (require "mutex-unit.rkt")
+(require "thread-unit.rkt")
 
 (provide continuation-dt@)
 
 (define debug-timer
-  (make-debug-fun 2))
+  (make-debug-fun 1))
 
 (define-unit continuation-dt@
-  (import data-structures^ proc-def^ store^ senv^ operator-fun^ cont-valueof^ apply-procedure^ scheduler^ mutex^)
+  (import data-structures^ proc-def^ store^ senv^ operator-fun^
+          cont-valueof^ apply-procedure^ scheduler^ mutex^ thread^)
   (export continuation^)
 
   ;; data representation of continuations
@@ -92,6 +94,8 @@
      (cont continuation?))
     (signal-cont
      (cont continuation?))
+    (kill-cont
+     (cont continuation?))
     )
 
   (define make-let-cont-by-op
@@ -115,6 +119,7 @@
      (list "wait" 1 wait-cont)
      (list "signal" 1 signal-cont)
      (list "spawn" 2 spawn-cont)
+     (list "kill" 1 kill-cont)
      ))
   (define apply-cont
     (lambda (cont aw)
@@ -122,9 +127,10 @@
       (if (time-expired?)
           (begin
             (place-on-ready-queue!
-             (lambda(store)
-               (apply-cont cont (an-answer (answer->eval aw)
-                                           store))))
+             (make-thread
+              (lambda(store)
+                (apply-cont cont (an-answer (answer->eval aw)
+                                            store)))))
             (run-next-thread (answer->store aw)))
           (begin
             (debug-timer "time-remain" "~s\n" (get-time-remaining))
@@ -264,16 +270,24 @@
                                                   ref
                                                   eval)))))
               (spawn-cont (env cont)
-                          (let ((proc (expval->proc (answer->eval aw))))
+                          (let* ((proc (expval->proc (answer->eval aw)))
+                                 (thread (new-thread
+                                          (lambda(store)
+                                            (apply-procedure/k proc
+                                                               (list (num-val (get-cur-thread-id)))
+                                                               (cons env store)
+                                                               (end-subthread-cont))))))
                             (place-on-ready-queue!
-                             (lambda(store)
-                               (apply-procedure/k proc
-                                                  (list (num-val 28))
-                                                  (cons env store)
-                                                  (end-subthread-cont))))
-                            (apply-cont cont (an-answer (num-val 73)
+                             thread)
+                            (apply-cont cont (an-answer (num-val (get-thread-id thread))
                                                         (answer->store aw)))))
-
+              (kill-cont (cont)
+                         (let ((th-id (expval->num (answer->eval aw))))
+                           (debug-thread "kill" "thid:~s cur-thid:~s\n" th-id (get-cur-thread-id))
+                           (if (equal? th-id (get-cur-thread-id))
+                               (run-next-thread (answer->store aw))
+                               (apply-cont cont (an-answer (num-val 30)
+                                                           (remove-thread th-id (answer->store aw)))))))
               (end-cont ()
                         (printf "End of Computation. \n")
                         (answer->eval aw))
@@ -304,7 +318,7 @@
       (if (mutex->isclose? mutex store)
           (run-next-thread
            (answer->store
-            (mutex->place-on-wait-queue! mutex store cont-fun)))
+            (mutex->place-on-wait-queue! mutex store (make-thread cont-fun))))
           (cont-fun
            (answer->store
             (mutex->close mutex store))))))
@@ -317,8 +331,10 @@
             (mutex->waitq-dequeue mutex store
                                   (lambda (thread)
                                     (place-on-ready-queue! thread))))))))
-
-
-
+  (define remove-thread
+    (lambda(th-id store)
+      (begin
+        (remove-thread-from-ready-queue! th-id)
+        (remove-thread-from-mutexq! th-id store))))
 
   )
