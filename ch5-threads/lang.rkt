@@ -8,10 +8,11 @@
   '((white-sp (whitespace) skip)
     (number ((or digit (concat "-" digit)) (arbno digit)) number)
     (identifier (letter (arbno (or letter digit "?" "-" "_"))) symbol)
-    (binary-op ((or "+" "-" "*" "/" "equal?" "greater?" "less?" "cons")) string)
+    (binary-op ((or "+" "-" "*" "/" "equal?" "greater?" "less?" "cons"
+                    "send")) string)
     (unary-op ((or "minus" "zero?" "car" "cdr" "null?"
                    "print" "wait" "signal" "spawn" "kill")) string)
-    (none-op ((or "emptylist" "mutex" "yield")) string)
+    (none-op ((or "emptylist" "mutex" "yield" "recive")) string)
     (any-op ((or "list")) string)
     (let-op ((or "let" "let*")) string)
     (proc-op ((or "proc" "traceproc" "dyproc")) string)

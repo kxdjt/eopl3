@@ -1,8 +1,9 @@
 #lang racket
 
-(provide list-member? remove-by-idx debug-fun printf-hlmsg
-         debug-info debug-trace debug-notice list-head
-         make-debug-fun debug-thread)
+(provide list-member? list-member remove-by-idx
+         debug-fun printf-hlmsg debug-info debug-trace
+         debug-notice list-head make-debug-fun
+         debug-thread)
 
 (define DEBUG #f)
 (define TRACE #f)
@@ -79,13 +80,28 @@
         (foldl fun (cdr lst) (fun (car lst) init-res)))))
 (define list-member?
   (lambda (search-v lst . pred)
+    (define list-member?-tmp
+      (lambda (lst pred?)
+        (if (null? lst)
+            #f
+            (if (pred? search-v (car lst))
+                #t
+                (list-member?-tmp (cdr lst) pred?)))))
     (let ((pred? (if (null? pred) equal?
                      (car pred))))
-      (if (null? lst)
-          #f
-          (if (pred? search-v (car lst))
-              #t
-              (list-member? search-v (cdr lst)))))))
+      (list-member?-tmp lst pred?))))
+(define list-member
+  (lambda (search-v lst . pred)
+    (define list-member-tmp
+      (lambda (lst pred?)
+        (if (null? lst)
+            #f
+            (if (pred? search-v (car lst))
+                (car lst)
+                (list-member-tmp (cdr lst) pred?)))))
+    (let ((pred? (if (null? pred) equal?
+                     (car pred))))
+      (list-member-tmp lst pred?))))
 (define forward
   (lambda (x . xs)
     x))

@@ -261,10 +261,12 @@
   (define end-subthread-cont
     (make-list-cont
      (lambda (aw cont)
+       (debug-thread "end-subthread" "thid:~s\n" (get-cur-thread-id))
        (run-next-thread (answer->store aw)))))
   (define end-main-thread-cont
     (make-list-cont
      (lambda (aw cont)
+       (debug-thread "end-mainthread" "thid:~s\n" (get-cur-thread-id))
        (set-final-answer! aw)
        (run-next-thread (answer->store aw)))))
   (define wait-cont
@@ -315,10 +317,5 @@
      (list "kill" 1 kill-cont)
      ))
 
-  (define remove-thread
-    (lambda(th-id store)
-      (begin
-        (remove-thread-from-ready-queue! th-id)
-        (remove-thread-from-mutexq! th-id store))))
   )
 

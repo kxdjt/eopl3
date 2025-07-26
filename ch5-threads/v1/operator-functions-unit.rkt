@@ -44,6 +44,17 @@
       (list-val
        (cons-val eval1
                  (expval->list eval2)))))
+  (define send-op
+    (lambda (eval1 eval2)
+      (let ((th-id (expval->num eval1)))
+        (if (send-thread-msg th-id eval2)
+            (begin
+              (remove-thread-from-wait-queue!
+               th-id
+               (lambda (thread)
+                 (place-on-ready-queue! thread)))
+              (bool-val #t))
+            (bool-val #f)))))
   (define zero?-op
     (lambda (eval)
       (if (zero? (expval->num eval))
@@ -90,6 +101,20 @@
             (apply-cont cont (an-answer (num-val 99)
                                         store)))))
         (run-next-thread store))))
+  (define recive-op
+    (lambda (store cont)
+      (let ((th-id (get-cur-thread-id)))
+        (if (thread-msg-list-is-empty? th-id)
+            (begin
+              (place-on-wait-queue!
+               (make-thread
+                (lambda(store)
+                  (let ((msg (recive-thread-msg th-id)))
+                    (apply-cont cont (an-answer msg store))))))
+              (run-next-thread store))
+            (apply-cont cont (an-answer
+                              (recive-thread-msg th-id)
+                              store))))))
   ;; Register operator function
   (define apply-cont-fun
     (lambda (store-fun)
@@ -114,6 +139,7 @@
      (cons "greater?" (make-num-pred-op >))
      (cons "less?" (make-num-pred-op <))
      (cons "cons" cons-op)
+     (cons "send" send-op)
      ))
   (define unary-operator
     (make-fun-table
@@ -129,6 +155,7 @@
      (cons "emptylist" (apply-cont-fun (make-answer-fun emptylist-op)))
      (cons "mutex" (apply-cont-fun mutex-op))
      (cons "yield" yield-op)
+     (cons "recive" recive-op)
      ))
   (define any-operator
     (make-fun-table

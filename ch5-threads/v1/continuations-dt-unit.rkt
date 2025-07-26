@@ -292,8 +292,10 @@
                         (printf "End of Computation. \n")
                         (answer->eval aw))
               (end-subthread-cont ()
+                                  (debug-thread "end-subthread" "thid:~s\n" (get-cur-thread-id))
                                   (run-next-thread (answer->store aw)))
               (end-main-thread-cont ()
+                                    (debug-thread "end-mainthread" "thid:~s\n" (get-cur-thread-id))
                                     (set-final-answer! aw)
                                     (run-next-thread (answer->store aw)))
               (wait-cont (cont)
@@ -331,10 +333,4 @@
             (mutex->waitq-dequeue mutex store
                                   (lambda (thread)
                                     (place-on-ready-queue! thread))))))))
-  (define remove-thread
-    (lambda(th-id store)
-      (begin
-        (remove-thread-from-ready-queue! th-id)
-        (remove-thread-from-mutexq! th-id store))))
-
   )

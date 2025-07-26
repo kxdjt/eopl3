@@ -87,7 +87,7 @@
     (lambda (mutex store thread)
       (let* ((waitq (mutex->get-waitq mutex store))
              (new-waitq (enqueue waitq thread)))
-        (debug-thread "mutex->place-orq" "thread:~s wait-queue:~s\n" thread waitq)
+        (debug-thread "mutex->place-owq" "thread:~s wait-queue:~s\n" thread waitq)
         (mutex->set-waitq mutex store new-waitq))))
   (define mutex->waitq-empty?
     (lambda (mutex store)
@@ -117,7 +117,7 @@
                            (aw (mutex->set-waitq mutex
                                                  store
                                                  new-q)))
-                      (debug-thread "remove-waitq" "thid:~s old:~s new:~s\n"
+                      (debug-thread "remove-mutexwaitq" "thid:~s old:~s new:~s\n"
                                     th-id waitq new-q)
                       (remove-th (cdr m-list) (answer->store aw))
                       #| (answer->store aw) |#

@@ -158,3 +158,23 @@
               x
             end
         end")
+(define thread-test3
+  "let buffer= 0
+       mut = (mutex)
+    in let producer= proc(n)
+                      begin
+                        set buffer = (recive);
+                        (signal mut)
+                      end
+          in let consumer=proc(id ,n)
+                           (send id n)
+              in begin
+                 (wait mut);
+                 let th1 = (spawn producer)
+                    in begin
+                      (spawn proc(d)(consumer th1 44));
+                      (wait mut);
+                      (print buffer);
+                      buffer
+                      end
+                end")
