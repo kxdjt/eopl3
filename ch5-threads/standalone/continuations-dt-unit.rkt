@@ -1,17 +1,16 @@
 #lang racket
 
 (require eopl)
-(require "../data-structures-unit.rkt")
+(require "data-structures-unit.rkt")
 (require "../../common/enironment.rkt")
 (require "../../common/utils.rkt")
 (require "../procedure-sig.rkt")
-(require "../store-unit.rkt")
-(require "../senv-unit.rkt")
+(require "store-unit.rkt")
+(require "senv-unit.rkt")
 (require "operator-functions-unit.rkt")
 (require "continuations-sig.rkt")
 (require "../continuation-interface-sig.rkt")
 (require "scheduler-sig.rkt")
-(require "mutex-unit.rkt")
 (require "thread-unit.rkt")
 
 (provide continuation-dt@)
@@ -21,7 +20,7 @@
 
 (define-unit continuation-dt@
   (import data-structures^ proc-def^ store^ senv^ operator-fun^
-          cont-valueof^ apply-procedure^ scheduler^ mutex^ thread^)
+          cont-valueof^ apply-procedure^ scheduler^ thread^)
   (export continuation^)
 
   ;; data representation of continuations
@@ -90,10 +89,6 @@
      (cont continuation?))
     (end-subthread-cont)
     (end-main-thread-cont)
-    (wait-cont
-     (cont continuation?))
-    (signal-cont
-     (cont continuation?))
     (kill-cont
      (cont continuation?))
     )
@@ -116,8 +111,6 @@
   (define make-unary-cont-by-op
     (make-unary-cont-table
      unary-op-cont
-     (list "wait" 1 wait-cont)
-     (list "signal" 1 signal-cont)
      (list "spawn" 2 spawn-cont)
      (list "kill" 1 kill-cont)
      ))
@@ -128,10 +121,9 @@
           (begin
             (place-on-ready-queue!
              (make-thread
-              (lambda(store)
-                (apply-cont cont (an-answer (answer->eval aw)
-                                            store)))))
-            (run-next-thread (answer->store aw)))
+              (lambda()
+                (apply-cont cont aw))))
+            (run-next-thread))
           (begin
             (debug-timer "time-remain" "~s\n" (get-time-remaining))
             (decrement-timer!)
@@ -272,10 +264,10 @@
               (spawn-cont (env cont)
                           (let* ((proc (expval->proc (answer->eval aw)))
                                  (thread (new-thread
-                                          (lambda(store)
+                                          (lambda()
                                             (apply-procedure/k proc
                                                                (list (num-val (get-cur-thread-id)))
-                                                               (cons env store)
+                                                               (cons env (answer->store aw))
                                                                (end-subthread-cont))))))
                             (place-on-ready-queue!
                              thread)
@@ -285,7 +277,7 @@
                          (let ((th-id (expval->num (answer->eval aw))))
                            (debug-thread "kill" "thid:~s cur-thid:~s\n" th-id (get-cur-thread-id))
                            (if (equal? th-id (get-cur-thread-id))
-                               (run-next-thread (answer->store aw))
+                               (run-next-thread)
                                (apply-cont cont (an-answer (num-val 30)
                                                            (remove-thread th-id (answer->store aw)))))))
               (end-cont ()
@@ -293,44 +285,10 @@
                         (answer->eval aw))
               (end-subthread-cont ()
                                   (debug-thread "end-subthread" "thid:~s\n" (get-cur-thread-id))
-                                  (run-next-thread (answer->store aw)))
+                                  (run-next-thread))
               (end-main-thread-cont ()
                                     (debug-thread "end-mainthread" "thid:~s\n" (get-cur-thread-id))
                                     (set-final-answer! aw)
-                                    (run-next-thread (answer->store aw)))
-              (wait-cont (cont)
-                         (wait-for-mutex
-                          (answer->eval aw)
-                          (answer->store aw)
-                          (lambda (store)
-                            (apply-cont cont (an-answer
-                                              (num-val 53)
-                                              store)))))
-              (signal-cont (cont)
-                           (signal-mutex
-                            (answer->eval aw)
-                            (answer->store aw)
-                            (lambda(store)
-                              (apply-cont cont (an-answer
-                                                (num-val 54)
-                                                store)))))
+                                    (run-next-thread))
               )))))
-  (define wait-for-mutex
-    (lambda (mutex store cont-fun)
-      (if (mutex->isclose? mutex store)
-          (run-next-thread
-           (answer->store
-            (mutex->place-on-wait-queue! mutex store (make-thread cont-fun))))
-          (cont-fun
-           (answer->store
-            (mutex->close mutex store))))))
-  (define signal-mutex
-    (lambda (mutex store cont-fun)
-      (cont-fun
-       (answer->store
-        (if (mutex->waitq-empty? mutex store)
-            (mutex->open mutex store)
-            (mutex->waitq-dequeue mutex store
-                                  (lambda (thread)
-                                    (place-on-ready-queue! thread))))))))
   )

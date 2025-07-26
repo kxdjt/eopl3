@@ -178,3 +178,18 @@
                       buffer
                       end
                 end")
+(define standalone-test
+  "let consumer= proc(id)
+                 let p = (recive)
+                 in begin
+                     (print p);
+                     (send id p)
+                    end
+       producer=proc(id ,n)
+                 (send id n)
+              in
+                 let* th1 = (spawn proc(d)(consumer 0))
+                      th2 = (spawn proc(d)(producer th1 44))
+                    in
+                      (print (recive))
+                 ")

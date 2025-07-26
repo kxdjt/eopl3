@@ -5,7 +5,7 @@
 (require "continuation-evaluation-unit.rkt"
          "continuations-dt-unit.rkt"
          "procedure-def-unit.rkt"
-         "continuation-interface-sig.rkt"
+         "../continuation-interface-sig.rkt"
          "continuations-sig.rkt"
          "scheduler-unit.rkt"
          "mutex-unit.rkt"

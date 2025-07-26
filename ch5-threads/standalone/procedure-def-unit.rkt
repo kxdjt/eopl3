@@ -1,7 +1,7 @@
 #lang racket
 
 (require "../procedure-sig.rkt")
-(require "../senv-unit.rkt")
+(require "senv-unit.rkt")
 (require "../continuation-interface-sig.rkt")
 
 (provide proc-def@)

@@ -2,10 +2,9 @@
 
 (require "scheduler-sig.rkt")
 (require "../../common/queue.rkt")
-(require "../store-unit.rkt")
+(require "store-unit.rkt")
 (require "../../common/utils.rkt")
 (require "thread-unit.rkt")
-(require "mutex-unit.rkt")
 
 (define the-ready-queue '())
 (define the-wait-queue '())
@@ -16,7 +15,7 @@
 (provide scheduler@ scheduler^)
 
 (define-unit scheduler@
-  (import store^ thread^ mutex^)
+  (import store^ thread^)
   (export scheduler^)
 
   (define initialize-scheduler!
@@ -57,7 +56,7 @@
             'none))))
 
   (define run-next-thread
-    (lambda (store)
+    (lambda ()
       (if (empty? the-ready-queue)
           (answer->eval the-final-answer)
           (dequeue the-ready-queue
@@ -66,7 +65,7 @@
                      (set! the-time-remaining the-max-time-slice)
                      (set-cur-thread-id! (get-thread-id n-thread))
                      (debug-thread "run-nt" "n-thread:~s the-ready-queue:~s\n" n-thread the-ready-queue)
-                     (apply-thread n-thread store))))))
+                     (apply-thread n-thread))))))
   (define remove-thread-from-ready-queue!
     (lambda (th-id)
       (define pred?
@@ -103,6 +102,6 @@
         (remove-message-list-by-id! th-id)
         (remove-thread-from-ready-queue! th-id)
         (remove-thread-from-wait-queue! th-id)
-        (remove-thread-from-mutexq! th-id store))))
+        )))
 
   )

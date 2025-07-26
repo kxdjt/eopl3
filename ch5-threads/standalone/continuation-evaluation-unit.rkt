@@ -4,19 +4,18 @@
 (require "../../common/utils.rkt")
 
 (require "../../common/enironment.rkt")
-(require "../data-structures-unit.rkt")
+(require "data-structures-unit.rkt")
 (require "operator-functions-unit.rkt")
-(require "../senv-unit.rkt")
-(require "../store-unit.rkt")
+(require "senv-unit.rkt")
+(require "store-unit.rkt")
 (require "continuations-sig.rkt")
 (require "../continuation-interface-sig.rkt")
-(require "mutex-unit.rkt")
 
 #| (provide value-of/k) |#
 (provide (all-defined-out))
 
 (define-unit value-of/k-imp@
-  (import data-structures^ operator-fun^ senv^ store^ continuation^ mutex^)
+  (import data-structures^ operator-fun^ senv^ store^ continuation^)
   (export cont-valueof^)
 
   ;; Exp * Env * Cont -> Bounce

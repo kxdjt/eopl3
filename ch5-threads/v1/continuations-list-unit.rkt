@@ -10,7 +10,7 @@
 (require "../senv-unit.rkt")
 (require "operator-functions-unit.rkt")
 (require "continuations-sig.rkt")
-(require "continuation-interface-sig.rkt")
+(require "../continuation-interface-sig.rkt")
 (require "scheduler-sig.rkt")
 (require "mutex-unit.rkt")
 (require "thread-unit.rkt")

@@ -3,28 +3,26 @@
 (require eopl)
 
 (require "continuation-evaluation-unit.rkt"
-         "continuations-list-unit.rkt"
+         "continuations-dt-unit.rkt"
          "procedure-def-unit.rkt"
          "../continuation-interface-sig.rkt"
          "continuations-sig.rkt"
          "scheduler-unit.rkt"
-         "mutex-unit.rkt"
          "thread-unit.rkt"
-         "../data-structures-unit.rkt"
+         "data-structures-unit.rkt"
          "operator-functions-unit.rkt"
-         "../senv-unit.rkt"
-         "../store-unit.rkt")
+         "senv-unit.rkt"
+         "store-unit.rkt")
 
 (define-compound-unit/infer inter@
   (import)
   (export cont-valueof^ continuation^ senv^
-          data-structures^ scheduler^ thread^ mutex^)
+          data-structures^ scheduler^ thread^)
   (link value-of/k-imp@
         apply-procedure@
         scheduler@
-        mutex@
         thread@
-        continuation-list@
+        continuation-dt@
         proc-def@
         data-structures@
         operator-fun@
@@ -54,7 +52,6 @@
       (a-program (exp1)
                  (initialize-scheduler! 10)
                  (initialize-thread!)
-                 (initialize-mutex!)
                  (value-of/k exp1
                              (init-senv)
                              (end-main-thread-cont))))))

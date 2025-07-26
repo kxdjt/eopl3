@@ -3,7 +3,7 @@
 (require "../store-unit.rkt")
 (require "../data-structures-unit.rkt")
 (require "../../common/utils.rkt")
-(require "queue.rkt")
+(require "../../common/queue.rkt")
 (require "thread-unit.rkt")
 (require eopl)
 
