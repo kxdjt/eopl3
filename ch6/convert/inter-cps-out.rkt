@@ -2,9 +2,9 @@
 
 (require eopl)
 
-(require "./eval-cps-out-rmcont-unit.rkt"
+(require "./eval-cps-out-unit.rkt"
          "./data-structures-unit.rkt"
-         "./procdure-cps-out-rmcont-unit.rkt"
+         "./procedure-cps-out-unit.rkt"
          "./continuation-interface-sig.rkt"
          "./operator-functions-unit.rkt"
          "./gramer-cps-out-unit.rkt"
@@ -14,20 +14,20 @@
 (define-compound-unit/infer inter-cpsout@
   (import)
   (export data-structures^ cont-valueof^)
-  (link value-of/k-cpsout-rmcont@
-        proc-cps-out-rmcont@
+  (link value-of/k-cpsout@
+        proc-cps-out@
         data-structures@
         gramer-cpsout@
         operator-fun@))
 (define-values/invoke-unit/infer inter-cpsout@)
 
-(provide run expval->schemaval)
+(provide run expval->schemaval value-of-program)
 
 #| Interpreter for the LET language |#
 ;; run : string -> ExpVal
 (define run
   (lambda (string)
-    (value-of-program (scan&parse string))))
+    (value-of-program (scan&parse-cps-out string))))
 (define init-env
   (lambda ()
     (extend-env 'i (num-val 1)
@@ -38,7 +38,16 @@
 ;; Program -> FinalAnswer = ExpVal
 (define value-of-program
   (lambda (pgm)
-    (cases program pgm
-      (a-program (exp1)
-                 (value-of/k exp1
-                             (init-env))))))
+    (cases cps-program pgm
+      (cps-a-program (exp1)
+                     (value-of/k exp1
+                                 (init-env)
+                                 (end-cont))))))
+
+(define end-cont
+  (lambda ()
+    (lambda (val)
+      (eopl:printf "End of computation.~%")
+      (eopl:printf "This sentence should appear only once.~%")
+      val)))
+

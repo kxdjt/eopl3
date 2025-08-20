@@ -75,26 +75,26 @@
     (lambda (simple env)
       (debug-trace "value-of-simple-exp" "simple:~s\n" simple)
       (cases simpleexp simple
-        (const-exp (number) (num-val number))
-        (var-exp (ident) (apply-env env ident))
+        (cps-const-exp (number) (num-val number))
+        (cps-var-exp (ident) (apply-env env ident))
         (cps-proc-exp (vars body) (proc-val
                                    (procedure vars body env)))
-        (innerop-exp (inner-op simples)
-                     (let ((rand-vals
-                            (map
-                             (lambda (simple)
-                               (value-of-simple-exp simple env))
-                             simples)))
-                       (cases inner-operator inner-op
-                         (none-op (op)
-                                  ((none-operator op)))
-                         (binary-op (op)
-                                    ((binary-operator op) rand-vals))
-                         (unary-op (op)
-                                   ((unary-operator op) (car rand-vals)))
-                         (any-op (op)
-                                 ((any-operator op) rand-vals))
-                         )))
+        (cps-innerop-exp (inner-op simples)
+                         (let ((rand-vals
+                                (map
+                                 (lambda (simple)
+                                   (value-of-simple-exp simple env))
+                                 simples)))
+                           (cases cps-inner-operator inner-op
+                             (cps-none-op (op)
+                                          ((none-operator op)))
+                             (cps-binary-op (op)
+                                            ((binary-operator op) rand-vals))
+                             (cps-unary-op (op)
+                                           ((unary-operator op) (car rand-vals)))
+                             (cps-any-op (op)
+                                         ((any-operator op) rand-vals))
+                             )))
         )))
 
   (define extend-env-rec*

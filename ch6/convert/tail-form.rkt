@@ -5,7 +5,7 @@
 (require "./lang-cps-in.rkt")
 (require "../../common/utils.rkt")
 
-(provide run)
+(provide run simple-exp?)
 
 (define simple-exp?
   (lambda (exp)
@@ -49,6 +49,6 @@
 
 (define run
   (lambda (string)
-    (cases program (scan&parse string)
+    (cases program (scan&parse-cps-in string)
       (a-program (exp)
                  (tail-form? exp)))))

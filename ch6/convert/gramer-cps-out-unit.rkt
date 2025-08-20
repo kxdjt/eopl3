@@ -10,4 +10,4 @@
   (export gramer-inf^)
 
   (define inner-operator?
-    cps-inner-operator?))
+    cps-cps-inner-operator?))

@@ -6,8 +6,14 @@
 (require (prefix-in cpsoutreg- "./inter-cps-out-reg.rkt"))
 (require (rename-in "./tail-form.rkt"
                     (run tail-form?)))
+(require "./lang-cps-in.rkt")
+(require "./lang-cps-out.rkt")
+(require (rename-in "./translator.rkt"
+                    (run cps-of-exp)))
 
 (require "./test.rkt")
+
+(require eopl)
 
 (define ns (variable-reference->namespace (#%variable-reference)))
 
@@ -17,6 +23,9 @@
 
 (define out-inters
   (list "cpsout" "cpsoutrm" "cpsoutreg"))
+
+(define test-funs
+  (list "trans-test" "tail-form-test" "translator-test"))
 
 (define trans-test
   (lambda(in-test out-test test-res)
@@ -54,7 +63,28 @@
                     cps-in-res cps-out-res)
             #f)))))
 
-(define run-test
+(define print-trans-exp
+  (lambda (in-test)
+    (cases program (scan&parse-cps-in in-test)
+      (a-program (exp1)
+                 (cps-of-exp exp1)))))
+
+(define translator-test
+  (lambda (in-test _ test-res)
+    (let* ((cps-exp
+            (cases program (scan&parse-cps-in in-test)
+              (a-program (exp1)
+                         (cps-of-exp exp1))))
+           (res (cpsout-expval->schemaval
+                 (cpsout-value-of-program
+                  (cps-a-program cps-exp)))))
+      (if (equal? res test-res)
+          #t
+          (printf "trans-res:~s test-res:~s\n"
+                  res test-res))
+      )))
+
+(define run-one-test
   (lambda (test-case test-fun)
     (let* ((test-name (car test-case))
            (test-res (cdr test-case))
@@ -66,36 +96,25 @@
           (printf "pass: case:~s\n" test-name)
           (printf "fail: case:~s\n" test-name)))))
 
-#| (define run-test-old |#
-#|   (lambda (test-case) |#
-#|     (let* ((test-name (car test-case)) |#
-#|            (test-res (cdr test-case)) |#
-#|            (in-teststr (string-append test-name "-cps-in")) |#
-#|            (out-teststr (string-append test-name "-cps-out")) |#
-#|            (in-res (cpsin-expval->schemaval |#
-#|                     (cpsin-run (string->ident in-teststr)))) |#
-#|            (out-res (cpsout-expval->schemaval |#
-#|                      (cpsout-run (string->ident out-teststr)))) |#
-#|            (outrm-res (cpsoutrm-expval->schemaval |#
-#|                        (cpsoutrm-run (string->ident out-teststr)))) |#
-#|            (outreg-res (cpsoutreg-expval->schemaval |#
-#|                         (cpsoutreg-run (string->ident out-teststr))))) |#
-#|       (if (and |#
-#|            (equal? in-res test-res) |#
-#|            (equal? out-res test-res) |#
-#|            (equal? outrm-res test-res) |#
-#|            (equal? outreg-res test-res)) |#
-#|           (printf "pass: case:~s\n" test-name) |#
-#|           (printf "fail: case:~s in-res:~s out-res:~s outrm-res:~s outreg-res:~s test-res:~s\n" |#
-#|                   test-name in-res out-res outrm-res outreg-res test-res))))) |#
-
-(define run-all-test
+(define run-tests
   (lambda(test-fun)
     (define helper
       (lambda(test-cases)
         (if (null? test-cases)
             (printf "finish all cases!\n")
             (begin
-              (run-test (car test-cases) test-fun)
+              (run-one-test (car test-cases) test-fun)
               (helper (cdr test-cases))))))
     (helper cps-trans-test)))
+
+(define run-all-test
+  (lambda()
+    (let helper ((test-funs test-funs))
+      (if (null? test-funs)
+          (printf "finish all tests!\n")
+          (let* ((test-fun-str (car test-funs))
+                 (test-fun (string->ident test-fun-str)))
+            (printf "------start run test:~s-------\n" test-fun-str)
+            (run-tests test-fun)
+            (printf "------end test:~s--------\n" test-fun-str)
+            (helper (cdr test-funs)))))))

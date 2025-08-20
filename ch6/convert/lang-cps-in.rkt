@@ -4,7 +4,7 @@
 (provide (all-defined-out))
 
 #| Syntax data types for the LET language |#
-(define scanner-spec-let
+(define scanner-spec-cps-in
   '((white-sp (whitespace) skip)
     (number ((or digit (concat "-" digit)) (arbno digit)) number)
     (identifier (letter (arbno (or letter digit "?" "-" "_"))) symbol)
@@ -15,7 +15,7 @@
     (none-op ((or "emptylist")) string)
     (any-op ((or "list")) string)
     ))
-(define grammar-let
+(define grammar-cps-in
   '((program (inpexp) a-program)
     (inpexp (number) const-exp)
     (inpexp ("if" inpexp "then" inpexp "else" inpexp) if-exp)
@@ -31,10 +31,10 @@
     (inner-operator (any-op) any-op)
     ))
 
-(sllgen:make-define-datatypes scanner-spec-let grammar-let)
+(sllgen:make-define-datatypes scanner-spec-cps-in grammar-cps-in)
 
-(define just-scan
-  (sllgen:make-string-scanner scanner-spec-let grammar-let))
+(define just-scan-cps-in
+  (sllgen:make-string-scanner scanner-spec-cps-in grammar-cps-in))
 
-(define scan&parse
-  (sllgen:make-string-parser scanner-spec-let grammar-let))
+(define scan&parse-cps-in
+  (sllgen:make-string-parser scanner-spec-cps-in grammar-cps-in))

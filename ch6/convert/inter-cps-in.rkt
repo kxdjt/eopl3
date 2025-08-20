@@ -2,24 +2,24 @@
 
 (require eopl)
 
-(require "./eval-cps-out-reg-unit.rkt"
+(require "./continuation-interface-sig.rkt"
+         "./lang-cps-in.rkt"
          "./data-structures-unit.rkt"
-         "./procdure-cps-out-rmcont-unit.rkt"
-         "./continuation-interface-sig.rkt"
+         "./procedure-cps-in-unit.rkt"
+         "./eval-cps-in-unit.rkt"
          "./operator-functions-unit.rkt"
-         "./gramer-cps-out-unit.rkt"
-         "../../common/enironment.rkt"
-         "./lang-cps-out.rkt")
+         "./gramer-cps-in-unit.rkt"
+         "../../common/enironment.rkt")
 
-(define-compound-unit/infer inter-cpsout@
+(define-compound-unit/infer inter-cpsin@
   (import)
   (export data-structures^ cont-valueof^)
-  (link value-of/k-cpsout-reg@
-        proc-cps-out-rmcont@
+  (link value-of/k-cpsin@
+        proc-cps-in@
         data-structures@
-        gramer-cpsout@
+        gramer-cpsin@
         operator-fun@))
-(define-values/invoke-unit/infer inter-cpsout@)
+(define-values/invoke-unit/infer inter-cpsin@)
 
 (provide run expval->schemaval)
 
@@ -27,7 +27,7 @@
 ;; run : string -> ExpVal
 (define run
   (lambda (string)
-    (value-of-program (scan&parse string))))
+    (value-of-program (scan&parse-cps-in string))))
 (define init-env
   (lambda ()
     (extend-env 'i (num-val 1)
@@ -41,4 +41,12 @@
     (cases program pgm
       (a-program (exp1)
                  (value-of/k exp1
-                             (init-env))))))
+                             (init-env)
+                             (end-cont))))))
+
+(define end-cont
+  (lambda ()
+    (lambda (val)
+      (eopl:printf "End of computation.~%")
+      (eopl:printf "This sentence should appear only once.~%")
+      val)))

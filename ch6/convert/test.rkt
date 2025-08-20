@@ -285,6 +285,27 @@
               list(6 7 8 9)
               proc(val) val)")
 
+(define if-cont-cps-in
+  "let p = proc(v1,v2)
+             +(v1 v2)
+       x = 1
+    in (p if equal?(x 2)
+          then +(x 1)
+          else +(x 2) 1)")
+(define if-cont-cps-out
+  "let p = proc(v1,v2,cont)
+            (cont +(v1 v2))
+       x = 1
+    in
+      let rcont = proc(val)
+                    (p val 1 proc(val) val)
+         in
+            if equal?(x 2)
+            then (rcont +(x 1))
+            else (rcont +(x 2))")
+(define list-test
+  "list(1 list(2) 3 list())")
+
 (define cps-trans-test
   (list
    (cons "removeall" '(1 3 4))
@@ -295,6 +316,6 @@
    (cons "map" '(1 4 9 16 25))
    (cons "fnlrgtn" 7)
    (cons "every" 1)
+   (cons "if-cont" 4)
    ))
-
 

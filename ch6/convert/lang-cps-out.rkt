@@ -4,7 +4,7 @@
 (provide (all-defined-out))
 
 #| Syntax data types for the LET language |#
-(define scanner-spec-let
+(define scanner-spec-cps-out
   '((white-sp (whitespace) skip)
     (number ((or digit (concat "-" digit)) (arbno digit)) number)
     (identifier (letter (arbno (or letter digit "?" "-" "_"))) symbol)
@@ -15,28 +15,28 @@
     (none-op ((or "emptylist")) string)
     (any-op ((or "list")) string)
     ))
-(define grammar-let
-  '((program (tfexp) a-program)
-    (simpleexp (number) const-exp)
-    (simpleexp (identifier) var-exp)
+(define grammar-cps-out
+  '((cps-program (tfexp) cps-a-program)
+    (simpleexp (number) cps-const-exp)
+    (simpleexp (identifier) cps-var-exp)
     (simpleexp ( "proc" "(" (separated-list identifier ",")  ")" tfexp) cps-proc-exp)
-    (simpleexp (inner-operator "(" (arbno simpleexp) ")") innerop-exp)
+    (simpleexp (cps-inner-operator "(" (arbno simpleexp) ")") cps-innerop-exp)
     (tfexp (simpleexp) simple-exp->exp)
     (tfexp ("let" (arbno identifier "=" simpleexp) "in" tfexp) cps-let-exp)
     (tfexp ("letrec" (arbno identifier "(" (arbno identifier) ")" "=" tfexp) "in" tfexp) cps-letrec-exp)
     (tfexp ("if" simpleexp "then" tfexp "else" tfexp) cps-if-exp)
     (tfexp ("(" simpleexp (arbno simpleexp) ")") cps-call-exp)
-    (inner-operator (none-op) none-op)
-    (inner-operator (binary-op) binary-op)
-    (inner-operator (unary-op) unary-op)
-    (inner-operator (any-op) any-op)
+    (cps-inner-operator (none-op) cps-none-op)
+    (cps-inner-operator (binary-op) cps-binary-op)
+    (cps-inner-operator (unary-op) cps-unary-op)
+    (cps-inner-operator (any-op) cps-any-op)
     ))
 
-(sllgen:make-define-datatypes scanner-spec-let grammar-let)
+(sllgen:make-define-datatypes scanner-spec-cps-out grammar-cps-out)
 
-(define just-scan
-  (sllgen:make-string-scanner scanner-spec-let grammar-let))
+(define just-scan-cps-out
+  (sllgen:make-string-scanner scanner-spec-cps-out grammar-cps-out))
 
-(define scan&parse
-  (sllgen:make-string-parser scanner-spec-let grammar-let))
+(define scan&parse-cps-out
+  (sllgen:make-string-parser scanner-spec-cps-out grammar-cps-out))
 
