@@ -152,7 +152,9 @@
 ;;cps-of-exp: InpExp * Cont(CPS-PROC-EXP/CPS-VAR-EXP) -> TfExp
 (define cps-of-exp
   (lambda(in-exp cont)
-    (debug-trace "cps-of-exp" "in-exp:~s\n" (exp->fmt in-exp))
+    (debug-trace "cps-of-exp"
+                 (string-append "in-exp:\n" (exp->fmt in-exp) "\n"))
+    #| "in-exp:~s\n" (exp->fmt in-exp)) |#
     (cases inpexp in-exp
       (const-exp (num)
                  (make-send-to-cont cont (cps-const-exp num)))
