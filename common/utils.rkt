@@ -3,12 +3,13 @@
 (provide list-member? list-member remove-by-idx
          debug-fun printf-hlmsg debug-info debug-trace
          debug-notice list-head make-debug-fun
-         debug-thread)
+         debug-thread debug-expfmt)
 
 (define DEBUG #f)
 (define TRACE #f)
 
-(define CUR-LEVEL 5)
+(define CUR-LEVEL 6)
+(define EXPFMT-LEVEL 6)
 (define THREAD-LEVEL 5)
 (define NOTICE-LEVEL 3)
 (define TRACE-LEVEL 2)
@@ -35,9 +36,10 @@
 (define make-tmp-debug
   (make-debug (lambda(level)
                 (or (equal? TRACE-LEVEL level)
-                    (equal? THREAD-LEVEL level)))))
+                    (equal? INFO-LEVEL level)
+                    ))))
 
-(define make-debug-fun make-greater-debug)
+(define make-debug-fun make-equal-debug)
 
 (define debug-trace
   (make-debug-fun TRACE-LEVEL))
@@ -47,6 +49,8 @@
   (make-debug-fun NOTICE-LEVEL))
 (define debug-thread
   (make-debug-fun THREAD-LEVEL))
+(define debug-expfmt
+  (make-debug-fun EXPFMT-LEVEL))
 
 (define remove-by-idx
   (lambda (lst idx)

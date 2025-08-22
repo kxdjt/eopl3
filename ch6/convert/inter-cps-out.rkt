@@ -10,6 +10,8 @@
          "./gramer-cps-out-unit.rkt"
          "../../common/enironment.rkt"
          "./lang-cps-out.rkt")
+(require "../../common/utils.rkt")
+(require "./fmt-cps-out.rkt")
 
 (define-compound-unit/infer inter-cpsout@
   (import)
@@ -40,6 +42,8 @@
   (lambda (pgm)
     (cases cps-program pgm
       (cps-a-program (exp1)
+                     (debug-expfmt "out-exp:"
+                                   (string-append "\n" (exp->fmt exp1) "\n"))
                      (value-of/k exp1
                                  (init-env)
                                  (end-cont))))))

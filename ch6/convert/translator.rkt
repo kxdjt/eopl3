@@ -10,12 +10,16 @@
 
 (provide run)
 
+(define first-cont
+  (lambda()
+    (let ((var-ident (new-ident)))
+      (cps-proc-exp (list var-ident)
+                    (simple-exp->exp (cps-var-exp var-ident))))))
+
 (define run
   (lambda(exp)
     (init-gident)
-    (cps-of-exp exp
-                (cps-proc-exp (list 'var)
-                              (simple-exp->exp (cps-var-exp 'var))))))
+    (cps-of-exp exp (first-cont))))
 
 (define make-proc-cont-call-by-let
   (lambda(idents body simple-exp)
@@ -152,8 +156,8 @@
 ;;cps-of-exp: InpExp * Cont(CPS-PROC-EXP/CPS-VAR-EXP) -> TfExp
 (define cps-of-exp
   (lambda(in-exp cont)
-    (debug-trace "cps-of-exp"
-                 (string-append "in-exp:\n" (exp->fmt in-exp) "\n"))
+    (debug-expfmt "cps-of-exp"
+                  (string-append "in-exp:\n" (exp->fmt in-exp) "\n"))
     #| "in-exp:~s\n" (exp->fmt in-exp)) |#
     (cases inpexp in-exp
       (const-exp (num)
