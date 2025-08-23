@@ -26,66 +26,69 @@
     (cps-let-exp idents (list simple-exp)
                  body)))
 
+(define replace-var-tfexp
+  (lambda(var simple-exp body)
+    (define obscured?
+      (lambda(vars)
+        (ormap (lambda(s-var)
+                 (equal? s-var var))
+               vars)))
+    (define replace-simple
+      (lambda (simp)
+        (cases simpleexp simp
+          (cps-var-exp (ident)
+                       (if (equal? ident var)
+                           simple-exp
+                           simp))
+          (cps-proc-exp (p-vars p-body)
+                        (if (obscured? p-vars)
+                            simp
+                            (cps-proc-exp p-vars
+                                          (replace-tfexp p-body))))
+          (cps-innerop-exp (op simpls)
+                           (cps-innerop-exp op
+                                            (map replace-simple
+                                                 simpls)))
+          (else
+           simp))))
+    (define replace-tfexp
+      (lambda (tfe)
+        (cases tfexp tfe
+          (simple-exp->exp (simp)
+                           (simple-exp->exp
+                            (replace-simple simp)))
+          (cps-let-exp (let-vars let-simpls let-body)
+                       (cps-let-exp let-vars
+                                    (map replace-simple
+                                         let-simpls)
+                                    (if (obscured? let-vars)
+                                        let-body
+                                        (replace-tfexp let-body))))
+          (cps-letrec-exp (letr-idents letr-varss letc-pbodys letc-body)
+                          (if (obscured? letr-idents)
+                              tfe
+                              (cps-letrec-exp letr-idents letr-varss
+                                              (map (lambda(vars pbody)
+                                                     (if (obscured? vars)
+                                                         pbody
+                                                         (replace-tfexp pbody)))
+                                                   letr-varss
+                                                   letc-pbodys)
+                                              (replace-tfexp letc-body))))
+          (cps-if-exp (s tf1 tf2)
+                      (cps-if-exp (replace-simple s)
+                                  (replace-tfexp tf1)
+                                  (replace-tfexp tf2)))
+          (cps-call-exp (simp1 simps)
+                        (cps-call-exp
+                         (replace-simple simp1)
+                         (map replace-simple simps))))))
+    (replace-tfexp body)))
+
 (define make-proc-cont-call-by-replace
   (lambda(idents body simple-exp)
     (debug-trace "replace" "idents:~s\n body:~s\n simple-exp:~s\n" idents body simple-exp)
-    (let ((var (car idents)))
-      (define obscured?
-        (lambda(vars)
-          (ormap (lambda(s-var)
-                   (equal? s-var var))
-                 vars)))
-      (define replace-simple
-        (lambda (simp)
-          (cases simpleexp simp
-            (cps-var-exp (ident)
-                         (if (equal? ident var)
-                             simple-exp
-                             simp))
-            (cps-proc-exp (p-vars p-body)
-                          (if (obscured? p-vars)
-                              simp
-                              (cps-proc-exp p-vars
-                                            (replace-tfexp p-body))))
-            (cps-innerop-exp (op simpls)
-                             (cps-innerop-exp op
-                                              (map replace-simple
-                                                   simpls)))
-            (else
-             simp))))
-      (define replace-tfexp
-        (lambda (tfe)
-          (cases tfexp tfe
-            (simple-exp->exp (simp)
-                             (simple-exp->exp
-                              (replace-simple simp)))
-            (cps-let-exp (let-vars let-simpls let-body)
-                         (cps-let-exp let-vars
-                                      (map replace-simple
-                                           let-simpls)
-                                      (if (obscured? let-vars)
-                                          let-body
-                                          (replace-tfexp let-body))))
-            (cps-letrec-exp (letr-idents letr-varss letc-pbodys letc-body)
-                            (if (obscured? letr-idents)
-                                tfe
-                                (cps-letrec-exp letr-idents letr-varss
-                                                (map (lambda(vars pbody)
-                                                       (if (obscured? vars)
-                                                           pbody
-                                                           (replace-tfexp pbody)))
-                                                     letr-varss
-                                                     letc-pbodys)
-                                                (replace-tfexp letc-body))))
-            (cps-if-exp (s tf1 tf2)
-                        (cps-if-exp (replace-simple s)
-                                    (replace-tfexp tf1)
-                                    (replace-tfexp tf2)))
-            (cps-call-exp (simp1 simps)
-                          (cps-call-exp
-                           (replace-simple simp1)
-                           (map replace-simple simps))))))
-      (replace-tfexp body))))
+    (replace-var-tfexp (car idents) simple-exp body)))
 
 (define make-proc-cont-call
   make-proc-cont-call-by-replace)
@@ -168,7 +171,7 @@
               (cps-of-if-exp exp1 exp2 exp3 cont))
       (let-exp (idents exps body)
                (debug-trace "cps-of-let-exp" "idents:~s\n" idents)
-               (cps-of-let-exp-to-proc idents exps body cont))
+               (cps-of-let-exp idents exps body cont))
       (letrec-exp (p-names p-varss p-bodys body)
                   (cps-letrec-exp p-names
                                   (map (lambda(p-vars)
@@ -244,11 +247,11 @@
                       (cases simpleexp cont
                         (cps-proc-exp (idents body)
                                       (let ((var-ident (new-ident)))
-                                        (cps-let-exp (list var-ident)
+                                        (cps-let-exp (list 'cont%00)
                                                      (list cont)
                                                      (cps-if-exp simp1
-                                                                 (cps-of-exp exp2 (cps-var-exp var-ident))
-                                                                 (cps-of-exp exp3 (cps-var-exp var-ident))))))
+                                                                 (cps-of-exp exp2 (cps-var-exp 'cont%00))
+                                                                 (cps-of-exp exp3 (cps-var-exp 'cont%00))))))
                         (else
                          (cps-if-exp simp1
                                      (cps-of-exp exp2 cont)

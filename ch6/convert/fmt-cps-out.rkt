@@ -110,7 +110,7 @@
       (simple-exp->exp (simp)
                        (exp->fmt-simple simp indent))
       (cps-let-exp (vars simps body)
-                   (make-exp-str "let\n"
+                   (make-exp-str "let"
                                  (make-seplst-str
                                   (lambda(var exp)
                                     (string-append (indent-str (+ 1 indent))
@@ -170,4 +170,6 @@
                                     ")"))))))
 (define exp->fmt
   (lambda (exp)
-    (exp->fmt-tfexp exp 0)))
+    (if (tfexp? exp)
+        (exp->fmt-tfexp exp 0)
+        (exp->fmt-simple exp 0))))

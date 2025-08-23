@@ -7,6 +7,7 @@
 (require "./operator-functions-unit.rkt")
 (require "../../common/enironment.rkt")
 (require "../../common/utils.rkt")
+(require "./fmt-cps-out.rkt")
 (require eopl)
 
 (provide value-of/k-cpsout@)
@@ -19,7 +20,8 @@
   ;;value-of/k : TfExp × Env × Cont → FinalAnswer
   (define value-of/k
     (lambda (exp env cont)
-      (debug-info "value-of/k" "exp:~s\n" exp)
+      (debug-trace "value-of/k"
+                   (string-append "exp:\n" (exp->fmt exp) "\n"))
       (cases tfexp exp
         (simple-exp->exp (simple)
                          (apply-cont cont
@@ -58,6 +60,8 @@
   ;;value-of-simple-exp : SimpleExp × Env → ExpVal
   (define value-of-simple-exp
     (lambda (simple env)
+      (debug-trace "value-of-simple-exp"
+                   (string-append "exp:\n" (exp->fmt simple) "\n"))
       (cases simpleexp simple
         (cps-const-exp (number) (num-val number))
         (cps-var-exp (ident) (apply-env env ident))

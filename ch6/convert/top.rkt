@@ -10,6 +10,10 @@
 (require "./lang-cps-out.rkt")
 (require (rename-in "./translator.rkt"
                     (run cps-of-exp)))
+(require (rename-in "./translator-dtcont.rkt"
+                    (run translator-dt)))
+
+(require "./fmt-cps-out.rkt")
 
 (require "./test.rkt")
 
@@ -25,7 +29,7 @@
   (list "cpsout" "cpsoutrm" "cpsoutreg"))
 
 (define test-funs
-  (list "trans-test" "tail-form-test" "translator-test"))
+  (list "trans-test" "tail-form-test" "translator-test" "translator-dt-test"))
 
 (define trans-test
   (lambda(in-test out-test test-res)
@@ -65,9 +69,13 @@
 
 (define print-trans-exp
   (lambda (in-test)
-    (cases program (scan&parse-cps-in in-test)
-      (a-program (exp1)
-                 (cps-of-exp exp1)))))
+    (let ((cps-exp
+           (cases program (scan&parse-cps-in in-test)
+             (a-program (exp1)
+                        (cps-of-exp exp1)))))
+      (printf (string-append "trans-res:\n"
+                             (exp->fmt cps-exp)
+                             "\n")))))
 
 (define translator-test
   (lambda (in-test _ test-res)
@@ -83,6 +91,30 @@
           (printf "trans-res:~s test-res:~s\n"
                   res test-res))
       )))
+(define print-translator-dt
+  (lambda (in-test . _)
+    (let* ((cps-exp
+            (cases program (scan&parse-cps-in in-test)
+              (a-program (exp1)
+                         (cps-of-exp exp1))))
+           (trans-exp (translator-dt cps-exp)))
+      (printf (string-append "trans-res:\n"
+                             (exp->fmt trans-exp)
+                             "\n")))))
+(define translator-dt-test
+  (lambda (in-test _ test-res)
+    (let* ((cps-exp
+            (cases program (scan&parse-cps-in in-test)
+              (a-program (exp1)
+                         (cps-of-exp exp1))))
+           (trans-exp (translator-dt cps-exp)))
+      (let ((res (cpsout-expval->schemaval
+                  (cpsout-value-of-program
+                   (cps-a-program trans-exp)))))
+        (if (equal? res test-res)
+            #t
+            (printf "trans-res:~s test-res:~s\n"
+                    res test-res))))))
 
 (define run-one-test
   (lambda (test-case test-fun)
