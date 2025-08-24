@@ -171,7 +171,7 @@
               (cps-of-if-exp exp1 exp2 exp3 cont))
       (let-exp (idents exps body)
                (debug-trace "cps-of-let-exp" "idents:~s\n" idents)
-               (cps-of-let-exp idents exps body cont))
+               (cps-of-let-exp-to-proc idents exps body cont))
       (letrec-exp (p-names p-varss p-bodys body)
                   (cps-letrec-exp p-names
                                   (map (lambda(p-vars)

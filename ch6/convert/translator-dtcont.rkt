@@ -31,15 +31,24 @@
                  (string-append ":\n" (exp->fmt exp) "\n"))
     (cases tfexp exp
       (cps-let-exp (idents simps body)
-                   (dtcont-of-simps simps conts
-                                    (lambda (new-simps new-conts)
-                                      (dtcont-of-tfexp/ctx body new-conts
-                                                           (lambda(new-body n-cons)
-                                                             (builder
-                                                              (cps-let-exp idents
-                                                                           new-simps
-                                                                           new-body)
-                                                              n-cons))))))
+                   (if (and (not (null? idents))
+                            (equal? (car idents) 'cont%00))
+                       (dtcont-of-cont-simp (car simps) conts
+                                            (lambda(new-simp new-conts)
+                                              (dtcont-of-tfexp/ctx body new-conts
+                                                                   (lambda(new-body new-conts)
+                                                                     (builder
+                                                                      (cps-let-exp idents (list new-simp) new-body)
+                                                                      new-conts)))))
+                       (dtcont-of-simps simps conts
+                                        (lambda (new-simps new-conts)
+                                          (dtcont-of-tfexp/ctx body new-conts
+                                                               (lambda(new-body n-cons)
+                                                                 (builder
+                                                                  (cps-let-exp idents
+                                                                               new-simps
+                                                                               new-body)
+                                                                  n-cons)))))))
       (cps-letrec-exp (idents p-varss p-bodies body)
                       (dtcont-of-tfexps p-bodies conts
                                         (lambda(new-tfexps new-conts)
@@ -65,14 +74,20 @@
       (cps-call-exp (simp1 simps)
                     (if (is-cont-call? simp1)
                         (dtcont-of-apply-cont simp1 simps conts builder)
-                        (dtcont-of-simp/ctx simp1 conts
-                                            (lambda(new-simp1 new-conts)
-                                              (dtcont-of-simps simps new-conts
-                                                               (lambda (new-simps new-conts)
-                                                                 (builder
-                                                                  (cps-call-exp new-simp1
-                                                                                new-simps)
-                                                                  new-conts)))))))
+                        (let* ((rev-simps (reverse simps))
+                               (cont-simp (car rev-simps))
+                               (ex-cont-simps (cons simp1 (reverse (cdr rev-simps)))))
+                          (dtcont-of-simps ex-cont-simps conts
+                                           (lambda (new-simps new-conts)
+                                             (dtcont-of-cont-simp cont-simp new-conts
+                                                                  (lambda(new-simp new-conts)
+                                                                    (builder
+                                                                     (cps-call-exp (car new-simps)
+                                                                                   (reverse
+                                                                                    (cons new-simp
+                                                                                          (reverse
+                                                                                           (cdr new-simps)))))
+                                                                     new-conts))))))))
       (simple-exp->exp (simp)
                        (dtcont-of-simp/ctx simp conts
                                            (lambda(new-simp new-conts)
@@ -86,16 +101,12 @@
                  (string-append ":\n" (exp->fmt simp) "\n"))
     (cases simpleexp simp
       (cps-proc-exp (p-vars body)
-                    (if (is-cont-proc? p-vars)
-                        (make-cont p-vars body
-                                   (lambda(cont-exp new-conts)
-                                     (builder cont-exp (append new-conts conts))))
-                        (dtcont-of-tfexp/ctx body conts
-                                             (lambda(new-body new-conts)
-                                               (builder
-                                                (cps-proc-exp p-vars
-                                                              new-body)
-                                                new-conts)))))
+                    (dtcont-of-tfexp/ctx body conts
+                                         (lambda(new-body new-conts)
+                                           (builder
+                                            (cps-proc-exp p-vars
+                                                          new-body)
+                                            new-conts))))
       (cps-innerop-exp (op simps)
                        (dtcont-of-simps simps conts
                                         (lambda (new-simps new-conts)
@@ -104,6 +115,16 @@
                                            new-conts))))
       (else
        (builder simp conts)))))
+
+(define dtcont-of-cont-simp
+  (lambda (simp conts builder)
+    (cases simpleexp simp
+      (cps-proc-exp (p-vars body)
+                    (make-cont p-vars body
+                               (lambda(cont-exp new-conts)
+                                 (builder cont-exp (append new-conts conts)))))
+      (else
+       (dtcont-of-simp/ctx simp conts builder)))))
 
 (define make-dtcont-of-exps
   (lambda(ctx-fun)
