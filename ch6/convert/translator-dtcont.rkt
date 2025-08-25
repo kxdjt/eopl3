@@ -98,7 +98,7 @@
 (define dtcont-of-simp/ctx
   (lambda (simp conts builder)
     (debug-trace "dtcont-of-simp/ctx"
-                 (string-append ":\n" (exp->fmt simp) "\n"))
+                 (string-append "\n" (exp->fmt simp) "\n"))
     (cases simpleexp simp
       (cps-proc-exp (p-vars body)
                     (dtcont-of-tfexp/ctx body conts

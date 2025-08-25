@@ -12,6 +12,8 @@
                     (run cps-of-exp)))
 (require (rename-in "./translator-dtcont.rkt"
                     (run translator-dt)))
+(require (rename-in "./translator-dtproc.rkt"
+                    (run translator-dp)))
 
 (require "./fmt-cps-out.rkt")
 
@@ -29,7 +31,8 @@
   (list "cpsout" "cpsoutrm" "cpsoutreg"))
 
 (define test-funs
-  (list "trans-test" "tail-form-test" "translator-test" "translator-dt-test"))
+  (list "trans-test" "tail-form-test" "translator-test" "translator-dt-test"
+        "translator-dp-test"))
 
 (define trans-test
   (lambda(in-test out-test test-res)
@@ -91,30 +94,45 @@
           (printf "trans-res:~s test-res:~s\n"
                   res test-res))
       )))
+
+(define make-translator-print
+  (lambda(translator-fun)
+    (lambda (in-test . _)
+      (let* ((cps-exp
+              (cases program (scan&parse-cps-in in-test)
+                (a-program (exp1)
+                           (cps-of-exp exp1))))
+             (trans-exp (translator-fun cps-exp)))
+        (printf (string-append "trans-res:\n"
+                               (exp->fmt trans-exp)
+                               "\n"))))))
+(define make-translator-test
+  (lambda(translator-fun)
+    (lambda (in-test _ test-res)
+      (let* ((cps-exp
+              (cases program (scan&parse-cps-in in-test)
+                (a-program (exp1)
+                           (cps-of-exp exp1))))
+             (trans-exp (translator-fun cps-exp)))
+        (let ((res (cpsout-expval->schemaval
+                    (cpsout-value-of-program
+                     (cps-a-program trans-exp)))))
+          (if (equal? res test-res)
+              #t
+              (printf "trans-res:~s test-res:~s\n"
+                      res test-res)))))))
+(define print-translator-dp
+  (make-translator-print
+   translator-dp))
 (define print-translator-dt
-  (lambda (in-test . _)
-    (let* ((cps-exp
-            (cases program (scan&parse-cps-in in-test)
-              (a-program (exp1)
-                         (cps-of-exp exp1))))
-           (trans-exp (translator-dt cps-exp)))
-      (printf (string-append "trans-res:\n"
-                             (exp->fmt trans-exp)
-                             "\n")))))
+  (make-translator-print
+   translator-dt))
+(define translator-dp-test
+  (make-translator-test
+   translator-dp))
 (define translator-dt-test
-  (lambda (in-test _ test-res)
-    (let* ((cps-exp
-            (cases program (scan&parse-cps-in in-test)
-              (a-program (exp1)
-                         (cps-of-exp exp1))))
-           (trans-exp (translator-dt cps-exp)))
-      (let ((res (cpsout-expval->schemaval
-                  (cpsout-value-of-program
-                   (cps-a-program trans-exp)))))
-        (if (equal? res test-res)
-            #t
-            (printf "trans-res:~s test-res:~s\n"
-                    res test-res))))))
+  (make-translator-test
+   translator-dt))
 
 (define run-one-test
   (lambda (test-case test-fun)
