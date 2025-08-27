@@ -73,6 +73,11 @@
   (define list-op
     (lambda(rands)
       (list-val rands)))
+  (define begin-op
+    (lambda(rands)
+      (if (null? rands)
+          (num-val 30)
+          (car (reverse rands)))))
 
   (define make-fun-table
     (lambda lst
@@ -107,5 +112,6 @@
   (define any-operator
     (make-fun-table
      (cons "list" list-op)
+     (cons "begin" begin-op)
      ))
   )

@@ -5,8 +5,6 @@
 (require "./data-structures-unit.rkt")
 (require "./procedure-sig.rkt")
 (require "./operator-functions-unit.rkt")
-(require "./senv-with-s-store-unit.rkt")
-(require "./store-s-unit.rkt")
 (require "../../common/enironment.rkt")
 (require "../../common/utils.rkt")
 (require "./fmt-cps-out.rkt")
@@ -15,42 +13,42 @@
 (provide value-of/k-cpsout@)
 
 (define-unit value-of/k-cpsout@
-  (import data-structures^ proc-def^ operator-fun^ senv^ s-store^)
+  (import data-structures^ proc-def^ operator-fun^)
   (export cont-valueof^)
 
 
   ;;value-of/k : TfExp × Env × Cont → FinalAnswer
   (define value-of/k
-    (lambda (exp senv cont)
+    (lambda (exp env cont)
       (debug-trace "value-of/k"
                    (string-append "exp:\n" (exp->fmt exp) "\n"))
       (cases tfexp exp
         (simple-exp->exp (simple)
                          (apply-cont cont
-                                     (value-of-simple-exp simple senv)))
+                                     (value-of-simple-exp simple env)))
         (cps-let-exp (vars rhss body)
                      (let ((rhs-vals (map
                                       (lambda(simple)
-                                        (value-of-simple-exp simple senv))
+                                        (value-of-simple-exp simple env))
                                       rhss)))
                        (value-of/k body
-                                   (extend-senv* vars rhs-vals senv)
+                                   (extend-env* vars rhs-vals env)
                                    cont)))
         (cps-letrec-exp (p-names b-varss p-bodies letrec-body)
                         (value-of/k letrec-body
-                                    (extend-senv-rec* p-names b-varss p-bodies senv)
+                                    (extend-env-rec* p-names b-varss p-bodies env)
                                     cont))
         (cps-if-exp (simple1 body1 body2)
-                    (if (expval->bool (value-of-simple-exp simple1 senv))
-                        (value-of/k body1 senv cont)
-                        (value-of/k body2 senv cont)))
+                    (if (expval->bool (value-of-simple-exp simple1 env))
+                        (value-of/k body1 env cont)
+                        (value-of/k body2 env cont)))
         (cps-call-exp (rator rands)
                       (let ((rator
-                             (value-of-simple-exp rator senv))
+                             (value-of-simple-exp rator env))
                             (rand-vals
                              (map
                               (lambda (simple)
-                                (value-of-simple-exp simple senv))
+                                (value-of-simple-exp simple env))
                               rands)))
                         (apply-procedure/k (expval->proc rator) rand-vals cont))))))
 
@@ -61,25 +59,19 @@
 
   ;;value-of-simple-exp : SimpleExp × Env → ExpVal
   (define value-of-simple-exp
-    (lambda (simple senv)
+    (lambda (simple env)
       (debug-trace "value-of-simple-exp"
                    (string-append "exp:\n" (exp->fmt simple) "\n"))
       (cases simpleexp simple
         (cps-const-exp (number) (num-val number))
-        (cps-var-exp (ident) (apply-senv senv ident))
-        (cps-set-exp (ident simp)
-                     (let ((res (value-of-simple-exp simp senv)))
-                       (setref!
-                        (apply-env senv ident)
-                        res)
-                       res))
+        (cps-var-exp (ident) (apply-env env ident))
         (cps-proc-exp (vars body) (proc-val
-                                   (procedure vars body senv)))
+                                   (procedure vars body env)))
         (cps-innerop-exp (inner-op simples)
                          (let ((rand-vals
                                 (map
                                  (lambda (simple)
-                                   (value-of-simple-exp simple senv))
+                                   (value-of-simple-exp simple env))
                                  simples)))
                            (cases cps-inner-operator inner-op
                              (cps-none-op (op)
@@ -92,4 +84,24 @@
                                          ((any-operator op) rand-vals))
                              )))
         )))
+
+  (define extend-env-rec*
+    (lambda (proc-names list-of-vars exps env)
+      (cons
+       (lambda (search-var)
+         (let ((res (ormap (lambda(proc-name vars exp1)
+                             (if (equal? search-var proc-name)
+                                 (proc-val (procedure vars exp1
+                                                      (extend-env-rec* proc-names list-of-vars exps env)))
+                                 #f))
+                           proc-names
+                           list-of-vars
+                           exps)))
+           (if (not res)
+               (apply-env env search-var)
+               res)))
+       (lambda (search-var)
+         (if (list-member? search-var proc-names)
+             #t
+             (has-binding? env search-var))))))
   )

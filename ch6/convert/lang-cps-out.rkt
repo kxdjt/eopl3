@@ -13,7 +13,7 @@
     (unary-op ((or "minus" "zero?" "car" "cdr" "null?" "number?"
                    "print" "add1")) string)
     (none-op ((or "emptylist")) string)
-    (any-op ((or "list")) string)
+    (any-op ((or "list" "begin")) string)
     ))
 (define grammar-cps-out
   '((cps-program (tfexp) cps-a-program)
@@ -21,6 +21,7 @@
     (simpleexp (identifier) cps-var-exp)
     (simpleexp ( "proc" "(" (separated-list identifier ",")  ")" tfexp) cps-proc-exp)
     (simpleexp (cps-inner-operator "(" (arbno simpleexp) ")") cps-innerop-exp)
+    (simpleexp ("set" identifier "=" simpleexp) cps-set-exp)
     (tfexp (simpleexp) simple-exp->exp)
     (tfexp ("let" (arbno identifier "=" simpleexp) "in" tfexp) cps-let-exp)
     (tfexp ("letrec" (arbno identifier "(" (arbno identifier) ")" "=" tfexp) "in" tfexp) cps-letrec-exp)

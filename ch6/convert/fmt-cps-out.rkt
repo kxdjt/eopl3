@@ -76,6 +76,12 @@
                      (make-exp-str (tostring num)))
       (cps-var-exp (ident)
                    (make-exp-str (tostring ident)))
+      (cps-set-exp (ident simp)
+                   (make-exp-str "set "
+                                 (tostring ident)
+                                 " = "
+                                 (exp->fmt-simple simp (+ 1 indent))
+                                 ))
       (cps-proc-exp (vars p-body)
                     (make-exp-str "proc"
                                   "("

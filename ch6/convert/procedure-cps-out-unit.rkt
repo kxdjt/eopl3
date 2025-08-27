@@ -4,12 +4,13 @@
 (require "procedure-sig.rkt")
 (require "./continuation-interface-sig.rkt")
 (require "../../common/enironment.rkt")
+(require "./senv-with-s-store-unit.rkt")
 (require eopl)
 
 (provide proc-cps-out@)
 
 (define-unit proc-cps-out@
-  (import cont-valueof^)
+  (import cont-valueof^ senv^)
   (export proc-def^)
 
 
@@ -25,6 +26,6 @@
       (cases proc proc1
         (procedure (vars body saved-env)
                    (value-of/k body
-                               (extend-env* vars args saved-env)
+                               (extend-senv* vars args saved-env)
                                cont)))))
   )

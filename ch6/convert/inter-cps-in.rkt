@@ -9,16 +9,20 @@
          "./eval-cps-in-unit.rkt"
          "./operator-functions-unit.rkt"
          "./gramer-cps-in-unit.rkt"
+         "./senv-unit.rkt"
+         "./store-unit.rkt"
          "../../common/enironment.rkt")
 
 (define-compound-unit/infer inter-cpsin@
   (import)
-  (export data-structures^ cont-valueof^)
+  (export data-structures^ cont-valueof^ senv^)
   (link value-of/k-cpsin@
         proc-cps-in@
         data-structures@
         gramer-cpsin@
-        operator-fun@))
+        operator-fun@
+        senv@
+        store@))
 (define-values/invoke-unit/infer inter-cpsin@)
 
 (provide run expval->schemaval)
@@ -28,12 +32,12 @@
 (define run
   (lambda (string)
     (value-of-program (scan&parse-cps-in string))))
-(define init-env
+(define init-senv
   (lambda ()
-    (extend-env 'i (num-val 1)
-                (extend-env 'v (num-val 5)
-                            (extend-env 'x (num-val 10)
-                                        (empty-env))))))
+    (extend-senv 'i (num-val 1)
+                 (extend-senv 'v (num-val 5)
+                              (extend-senv 'x (num-val 10)
+                                           (empty-senv))))))
 
 ;; Program -> FinalAnswer = ExpVal
 (define value-of-program
@@ -41,12 +45,12 @@
     (cases program pgm
       (a-program (exp1)
                  (value-of/k exp1
-                             (init-env)
+                             (init-senv)
                              (end-cont))))))
 
 (define end-cont
   (lambda ()
-    (lambda (val)
+    (lambda (val store)
       (eopl:printf "End of computation.~%")
       (eopl:printf "This sentence should appear only once.~%")
       val)))

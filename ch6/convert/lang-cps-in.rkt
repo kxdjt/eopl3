@@ -13,7 +13,7 @@
     (unary-op ((or "minus" "zero?" "car" "cdr" "null?" "number?"
                    "print" "add1")) string)
     (none-op ((or "emptylist")) string)
-    (any-op ((or "list")) string)
+    (any-op ((or "list" "begin")) string)
     ))
 (define grammar-cps-in
   '((program (inpexp) a-program)
@@ -29,6 +29,9 @@
     (inner-operator (binary-op) binary-op)
     (inner-operator (unary-op) unary-op)
     (inner-operator (any-op) any-op)
+    ;;-----------Store Interface------------------
+    ;;Expression ::= set identifier = expression
+    (inpexp ("set" identifier "=" inpexp) set-exp)
     ))
 
 (sllgen:make-define-datatypes scanner-spec-cps-in grammar-cps-in)

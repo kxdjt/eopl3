@@ -113,6 +113,13 @@
                                           (builder
                                            (cps-innerop-exp op new-simps)
                                            new-conts))))
+      (cps-set-exp (ident simp)
+                   (dtcont-of-simp/ctx simp conts
+                                       (lambda(new-simp new-conts)
+                                         (builder
+                                          (cps-set-exp ident
+                                                       new-simp)
+                                          new-conts))))
       (else
        (builder simp conts)))))
 
@@ -346,15 +353,19 @@
                      body
                      (append-bound-vars p-vars bound-vars)
                      free-vars
-                     (lambda(free-vars)
-                       (builder free-vars))))
+                     builder))
       (cps-innerop-exp (op simps)
                        (find-free-vars-simps
                         simps
                         bound-vars
                         free-vars
-                        (lambda(free-vars)
-                          (builder free-vars))))
+                        builder))
+      (cps-set-exp (ident simp)
+                   (find-free-vars-simp
+                    simp
+                    bound-vars
+                    free-vars
+                    builder))
       (else
        (builder free-vars)))))
 (define make-find-free-vars-exps

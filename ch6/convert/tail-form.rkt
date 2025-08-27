@@ -16,6 +16,8 @@
                 (tail-form? p-body))
       (innerop-exp (inner-op exps)
                    (andmap simple-exp? exps))
+      (set-exp (ident exp)
+               (simple-exp? exp))
       (else
        (begin
          (debug-trace "simple-exp?" "exp:~s\n" exp)
@@ -45,7 +47,9 @@
       (innerop-exp (inner-op exps)
                    (simple-exp? exp))
       (proc-exp (b-vars p-body)
-                (tail-form? p-body)))))
+                (tail-form? p-body))
+      (set-exp (ident exp)
+               (simple-exp? exp)))))
 
 (define run
   (lambda (string)

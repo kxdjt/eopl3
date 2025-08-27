@@ -8,15 +8,19 @@
          "./continuation-interface-sig.rkt"
          "./operator-functions-unit.rkt"
          "./gramer-cps-out-unit.rkt"
+         "./senv-with-s-store-unit.rkt"
+         "./store-s-unit.rkt"
          "../../common/enironment.rkt"
          "./lang-cps-out.rkt")
 (require "../../common/utils.rkt")
 (require "./fmt-cps-out.rkt")
 
 (define-compound-unit/infer inter-cpsout@
-  (import)
-  (export data-structures^ cont-valueof^)
+  (import )
+  (export data-structures^ cont-valueof^ senv^)
   (link value-of/k-cpsout@
+        senv-s@
+        s-store@
         proc-cps-out@
         data-structures@
         gramer-cpsout@
@@ -30,12 +34,12 @@
 (define run
   (lambda (string)
     (value-of-program (scan&parse-cps-out string))))
-(define init-env
+(define init-senv
   (lambda ()
-    (extend-env 'i (num-val 1)
-                (extend-env 'v (num-val 5)
-                            (extend-env 'x (num-val 10)
-                                        (empty-env))))))
+    (extend-senv 'i (num-val 1)
+                 (extend-senv 'v (num-val 5)
+                              (extend-senv 'x (num-val 10)
+                                           (empty-senv))))))
 
 ;; Program -> FinalAnswer = ExpVal
 (define value-of-program
@@ -45,7 +49,7 @@
                      (debug-expfmt "out-exp:"
                                    (string-append "\n" (exp->fmt exp1) "\n"))
                      (value-of/k exp1
-                                 (init-env)
+                                 (init-senv)
                                  (end-cont))))))
 
 (define end-cont

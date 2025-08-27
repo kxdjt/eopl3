@@ -49,6 +49,9 @@
                            (cps-innerop-exp op
                                             (map replace-simple
                                                  simpls)))
+          (cps-set-exp (ident simp)
+                       (cps-set-exp ident
+                                    (replace-simple simp)))
           (else
            simp))))
     (define replace-tfexp
@@ -157,6 +160,9 @@
                                     (context (cps-var-exp var-ident))))))))
 
 ;;cps-of-exp: InpExp * Cont(CPS-PROC-EXP/CPS-VAR-EXP) -> TfExp
+;;输出的tfexp是指与cont拼接后的tfexp:
+;;1.对于var、const这类简单的exp，通过与cont合并(转换为call或let语句)生成tfexp
+;;2.对于let、if等复杂的exp, 返回对应tfexp, cont作用于这些exp的子exp
 (define cps-of-exp
   (lambda(in-exp cont)
     (debug-expfmt "cps-of-exp"
@@ -167,6 +173,11 @@
                  (make-send-to-cont cont (cps-const-exp num)))
       (var-exp (ident)
                (make-send-to-cont cont (cps-var-exp ident)))
+      (set-exp (ident exp)
+               (cps-of-exp/ctx exp
+                               (lambda(simp)
+                                 (make-send-to-cont cont
+                                                    (cps-set-exp ident simp)))))
       (if-exp (exp1 exp2 exp3)
               (cps-of-if-exp exp1 exp2 exp3 cont))
       (let-exp (idents exps body)
@@ -197,6 +208,8 @@
                                                       new-exps)))))
       )))
 
+;;exp是符合cps-out语法规范的simple exp
+;;可直接转换为对应simpleexp，而无需传入cont进行拼接
 (define cps-of-simple-exp
   (lambda (exp)
     (debug-trace "cps-of-simple-exp" "in-exp:~s\n" (exp->fmt exp))
@@ -212,6 +225,9 @@
                                     (map (lambda(exp)
                                            (cps-of-simple-exp exp))
                                          exps)))
+      (set-exp (ident exp)
+               (cps-set-exp ident
+                            (cps-of-simple-exp exp)))
       (else
        (eopl:error 'cps-of-simple-exp "Not simple exp:~s\n" exp)))))
 (define cps-of-innerop

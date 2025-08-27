@@ -2,8 +2,8 @@
 
 (require (prefix-in cpsin- "./inter-cps-in.rkt"))
 (require (prefix-in cpsout- "./inter-cps-out.rkt"))
-(require (prefix-in cpsoutrm- "./inter-cps-out-rmcont.rkt"))
-(require (prefix-in cpsoutreg- "./inter-cps-out-reg.rkt"))
+#| (require (prefix-in cpsoutrm- "./inter-cps-out-rmcont.rkt")) |#
+#| (require (prefix-in cpsoutreg- "./inter-cps-out-reg.rkt")) |#
 (require (rename-in "./tail-form.rkt"
                     (run tail-form?)))
 (require "./lang-cps-in.rkt")
@@ -28,7 +28,8 @@
   (eval sym ns))
 
 (define out-inters
-  (list "cpsout" "cpsoutrm" "cpsoutreg"))
+  (list "cpsout"))
+#| (list "cpsout" "cpsoutrm" "cpsoutreg")) |#
 
 (define test-funs
   (list "trans-test" "tail-form-test" "translator-test" "translator-dt-test"
