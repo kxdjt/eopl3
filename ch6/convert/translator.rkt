@@ -173,6 +173,8 @@
                  (make-send-to-cont cont (cps-const-exp num)))
       (var-exp (ident)
                (make-send-to-cont cont (cps-var-exp ident)))
+      (str-exp (str)
+               (make-send-to-cont cont (cps-str-exp str)))
       (set-exp (ident exp)
                (cps-of-exp/ctx exp
                                (lambda(simp)
@@ -215,6 +217,7 @@
     (debug-trace "cps-of-simple-exp" "in-exp:~s\n" (exp->fmt exp))
     (cases inpexp exp
       (const-exp (num) (cps-const-exp num))
+      (str-exp (str) (cps-str-exp str))
       (var-exp (ident) (cps-var-exp ident))
       (proc-exp (idents body)
                 (cps-proc-exp

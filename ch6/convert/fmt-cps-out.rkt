@@ -76,6 +76,8 @@
                      (make-exp-str (tostring num)))
       (cps-var-exp (ident)
                    (make-exp-str (tostring ident)))
+      (cps-str-exp (str)
+                   (make-exp-str str))
       (cps-set-exp (ident simp)
                    (make-exp-str "set "
                                  (tostring ident)

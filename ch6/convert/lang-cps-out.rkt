@@ -7,6 +7,7 @@
 (define scanner-spec-cps-out
   '((white-sp (whitespace) skip)
     (number ((or digit (concat "-" digit)) (arbno digit)) number)
+    (str-text ( "\"" (arbno (or letter digit "%" "-" "?" "_")) "\"") string)
     (identifier (letter (arbno (or letter digit "?" "-" "_"))) symbol)
     (binary-op ((or "+" "-" "*" "/" "equal?" "greater?" "less?" "cons"
                     )) string)
@@ -19,6 +20,7 @@
   '((cps-program (tfexp) cps-a-program)
     (simpleexp (number) cps-const-exp)
     (simpleexp (identifier) cps-var-exp)
+    (simpleexp (str-text) cps-str-exp)
     (simpleexp ( "proc" "(" (separated-list identifier ",")  ")" tfexp) cps-proc-exp)
     (simpleexp (cps-inner-operator "(" (arbno simpleexp) ")") cps-innerop-exp)
     (simpleexp ("set" identifier "=" simpleexp) cps-set-exp)

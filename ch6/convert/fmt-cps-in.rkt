@@ -67,6 +67,8 @@
     (cases inpexp exp
       (const-exp (num)
                  (make-exp-str (tostring num)))
+      (str-exp (str)
+               (make-exp-str str))
       (if-exp (exp1 exp2 exp3)
               (make-exp-str "if "
                             (exp->fmt-indent exp1 (+ 1 indent))

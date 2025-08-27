@@ -31,6 +31,15 @@
             (bool-val #t)
             (bool-val #f)
             ))))
+  (define make-pred-op
+    (lambda (pred)
+      (lambda(evals)
+        (if (pred
+             (expval->schemaval (car evals))
+             (expval->schemaval (cadr evals)))
+            (bool-val #t)
+            (bool-val #f)
+            ))))
   (define cons-op
     (lambda (evals)
       (list-val (cons (car evals)
@@ -89,7 +98,7 @@
      (cons "-" (make-arithmetic-op -))
      (cons "*" (make-arithmetic-op *))
      (cons "/" (make-arithmetic-op /))
-     (cons "equal?" (make-num-pred-op equal?))
+     (cons "equal?" (make-pred-op equal?))
      (cons "greater?" (make-num-pred-op >))
      (cons "less?" (make-num-pred-op <))
      (cons "cons" cons-op)

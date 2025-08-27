@@ -12,6 +12,7 @@
     (cases inpexp exp
       (const-exp (_) #t)
       (var-exp (_) #t)
+      (str-exp (_) #t)
       (proc-exp (b-vars p-body)
                 (tail-form? p-body))
       (innerop-exp (inner-op exps)
@@ -28,6 +29,7 @@
     (cases inpexp exp
       (const-exp (num) #t)
       (var-exp (ident) #t)
+      (str-exp (str) #t)
       (if-exp (exp1 exp2 exp3)
               (and (simple-exp? exp1)
                    (tail-form? exp2)

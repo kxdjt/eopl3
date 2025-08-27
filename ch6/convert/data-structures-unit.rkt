@@ -15,10 +15,12 @@
    num-val
    proc-val
    bool-val
+   str-val
    innerop-val
    list-val
    expval->bool
    expval->num
+   expval->str
    expval->proc
    expval->innerop
    expval->list
@@ -36,6 +38,8 @@
   (define-datatype expval expval?
     (num-val
      (num number?))
+    (str-val
+     (str string?))
     (proc-val
      (proc proc?))
     (innerop-val
@@ -60,6 +64,11 @@
       (cases expval val
         (num-val (num) num)
         (else expval-extractor-error 'num val))))
+  (define expval->str
+    (lambda (val)
+      (cases expval val
+        (str-val (str) str)
+        (else expval-extractor-error 'str val))))
   (define expval->proc
     (lambda (val)
       (cases expval val
@@ -96,6 +105,7 @@
         (num-val (num) num)
         (proc-val (proc) proc)
         (innerop-val (innerop) innerop)
+        (str-val (str) str)
         (list-val (lst)
                   (if (null? lst)
                       '()

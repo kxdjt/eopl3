@@ -67,6 +67,7 @@
       (cases simpleexp simple
         (cps-const-exp (number) (num-val number))
         (cps-var-exp (ident) (apply-senv senv ident))
+        (cps-str-exp (str) (str-val str))
         (cps-set-exp (ident simp)
                      (let ((res (value-of-simple-exp simp senv)))
                        (setref!

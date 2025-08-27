@@ -71,7 +71,7 @@
                (list
                 (make-get-list-member-exp
                  0 proc-var-exp)
-                (cps-const-exp (car proc)))))))
+                (cps-str-exp (car proc)))))))
       (let helper ((procs o-procs))
         (if (null? procs)
             (simple-exp->exp
@@ -210,7 +210,10 @@
 (define new-proc-tag
   (lambda()
     (set! PROC-TAG (+ PROC-TAG 1))
-    PROC-TAG))
+    (string-append "proc%%-"
+                   (format "~s"
+                           PROC-TAG))
+    ))
 (define init-proc-tag
   (lambda()
     (set! PROC-TAG -1)))
@@ -237,7 +240,7 @@
                       free-vars)))
       (cps-innerop-exp
        (cps-any-op "list")
-       (cons (cps-const-exp tag)
+       (cons (cps-str-exp tag)
              proc-vals)))))
 (define make-proc
   (lambda (p-vars body procs builder)

@@ -7,6 +7,7 @@
 (define scanner-spec-cps-in
   '((white-sp (whitespace) skip)
     (number ((or digit (concat "-" digit)) (arbno digit)) number)
+    (str-text ( "\"" (arbno (or letter digit "%" "-" "?" "_")) "\"") string)
     (identifier (letter (arbno (or letter digit "?" "-" "_"))) symbol)
     (binary-op ((or "+" "-" "*" "/" "equal?" "greater?" "less?" "cons"
                     )) string)
@@ -20,6 +21,7 @@
     (inpexp (number) const-exp)
     (inpexp ("if" inpexp "then" inpexp "else" inpexp) if-exp)
     (inpexp (identifier) var-exp)
+    (inpexp (str-text) str-exp)
     (inpexp ("let" (arbno identifier "=" inpexp) "in" inpexp) let-exp)
     (inpexp ( "letrec" (arbno identifier "(" (arbno identifier) ")" "=" inpexp) "in" inpexp) letrec-exp)
     (inpexp ( "proc" "(" (separated-list identifier ",")  ")" inpexp) proc-exp)

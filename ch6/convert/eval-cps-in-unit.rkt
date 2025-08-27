@@ -36,6 +36,9 @@
           (const-exp (number)
                      (apply-cont cont
                                  (make-answer (num-val number))))
+          (str-exp (str)
+                   (apply-cont cont
+                               (make-answer (str-val str))))
           (if-exp (exp1 exp2 exp3)
                   (value-of/k exp1 senv
                               (if-cont exp2 exp3 env cont)))
