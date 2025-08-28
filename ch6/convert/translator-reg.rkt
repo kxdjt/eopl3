@@ -56,8 +56,8 @@
                                   (lambda(new-simps)
                                     (builder
                                      (cps-call-exp
-                                      simp1
-                                      (list (make-reg-call new-simps))
+                                      (make-reg-call new-simps simp1)
+                                      '()
                                       )))))
       (cps-letrec-exp (idents varss pbodiess body)
                       (reg-of-tfexps pbodiess
@@ -105,18 +105,20 @@
      (format "val%%-~s" idx))))
 
 (define make-reg-call
-  (lambda (simps)
+  (lambda (simps simp1)
     (cps-innerop-exp
      (cps-any-op "begin")
-     (foldl (lambda(val res)
-              (let ((idx (length res)))
-                (cons
-                 (cps-set-exp
-                  (make-pvar idx)
-                  val)
-                 res)))
-            '()
-            simps))
+     (append
+      (foldl (lambda(val res)
+               (let ((idx (length res)))
+                 (cons
+                  (cps-set-exp
+                   (make-pvar idx)
+                   val)
+                  res)))
+             '()
+             simps)
+      (list simp1)))
     ))
 (define make-proc-body
   (lambda(p-vars body)
