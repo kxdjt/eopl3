@@ -63,10 +63,11 @@
       (cps-binary-op (op) op)
       (cps-unary-op (op) op)
       (cps-any-op (op) op))))
-(define is-proc-simp?
+(define is-need-indent?
   (lambda (simp)
     (cases simpleexp simp
       (cps-proc-exp (v1 v2) #t)
+      (cps-set-exp (v1 v2) #t)
       (else #f))))
 (define exp->fmt-simple
   (lambda (simp indent)
@@ -95,7 +96,7 @@
                                   (indent-str (+ 1 indent))
                                   (exp->fmt-tfexp p-body (+ 1 indent))))
       (cps-innerop-exp (op simps)
-                       (let* ((need-indent (ormap is-proc-simp?
+                       (let* ((need-indent (ormap is-need-indent?
                                                   simps))
                               (ind-str (if need-indent
                                            (indent-str (+ 1 indent))
@@ -159,7 +160,7 @@
                                 (indent-str indent) "else "
                                 (exp->fmt-tfexp exp2 (+ 1 indent))))
       (cps-call-exp (simp1 simps)
-                    (let* ((need-indent (ormap is-proc-simp?
+                    (let* ((need-indent (ormap is-need-indent?
                                                (cons simp1 simps)))
                            (ind-str (if need-indent
                                         (indent-str (+ 1 indent))

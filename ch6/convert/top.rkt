@@ -14,6 +14,8 @@
                     (run translator-dt)))
 (require (rename-in "./translator-dtproc.rkt"
                     (run translator-dp)))
+(require (rename-in "./translator-reg.rkt"
+                    (run translator-reg)))
 
 (require "./fmt-cps-out.rkt")
 
@@ -33,7 +35,7 @@
 
 (define test-funs
   (list "trans-test" "tail-form-test" "translator-test" "translator-dt-test"
-        "translator-dp-test"))
+        "translator-dp-test" "translator-reg-test"))
 
 (define trans-test
   (lambda(in-test out-test test-res)
@@ -96,25 +98,27 @@
                   res test-res))
       )))
 
+(define make-translator
+  (lambda(translator-fun)
+    (lambda(in-test)
+      (let ((cps-exp
+             (cases program (scan&parse-cps-in in-test)
+               (a-program (exp1)
+                          (cps-of-exp exp1)))))
+        (translator-fun cps-exp)))))
+
 (define make-translator-print
   (lambda(translator-fun)
     (lambda (in-test . _)
-      (let* ((cps-exp
-              (cases program (scan&parse-cps-in in-test)
-                (a-program (exp1)
-                           (cps-of-exp exp1))))
-             (trans-exp (translator-fun cps-exp)))
+      (let ((trans-exp
+             (translator-fun in-test)))
         (printf (string-append "trans-res:\n"
                                (exp->fmt trans-exp)
                                "\n"))))))
 (define make-translator-test
   (lambda(translator-fun)
     (lambda (in-test _ test-res)
-      (let* ((cps-exp
-              (cases program (scan&parse-cps-in in-test)
-                (a-program (exp1)
-                           (cps-of-exp exp1))))
-             (trans-exp (translator-fun cps-exp)))
+      (let ((trans-exp (translator-fun in-test)))
         (let ((res (cpsout-expval->schemaval
                     (cpsout-value-of-program
                      (cps-a-program trans-exp)))))
@@ -124,16 +128,24 @@
                       res test-res)))))))
 (define print-translator-dp
   (make-translator-print
-   translator-dp))
+   (make-translator translator-dp)))
 (define print-translator-dt
   (make-translator-print
-   translator-dt))
+   (make-translator translator-dt)))
+(define print-translator-reg
+  (make-translator-print
+   (lambda(in-test)
+     (translator-reg ((make-translator translator-dp) in-test)))))
 (define translator-dp-test
   (make-translator-test
-   translator-dp))
+   (make-translator translator-dp)))
 (define translator-dt-test
   (make-translator-test
-   translator-dt))
+   (make-translator translator-dt)))
+(define translator-reg-test
+  (make-translator-test
+   (lambda(in-test)
+     (translator-reg ((make-translator translator-dp) in-test)))))
 
 (define run-one-test
   (lambda (test-case test-fun)
